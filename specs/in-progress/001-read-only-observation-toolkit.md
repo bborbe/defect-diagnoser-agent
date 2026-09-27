@@ -1,6 +1,9 @@
 ---
-status: draft
-created: 2026-09-27
+status: prompted
+approved: "2026-09-27T22:26:16Z"
+generating: "2026-09-27T22:27:05Z"
+prompted: "2026-09-27T22:57:16Z"
+branch: dark-factory/read-only-observation-toolkit
 ---
 
 ## Summary

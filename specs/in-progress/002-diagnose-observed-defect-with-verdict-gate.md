@@ -1,6 +1,8 @@
 ---
-status: draft
-created: 2026-09-27
+status: generating
+approved: "2026-09-27T22:27:39Z"
+generating: "2026-09-27T22:57:16Z"
+branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 
 ## Summary
