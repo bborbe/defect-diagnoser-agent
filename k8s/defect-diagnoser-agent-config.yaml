@@ -1,0 +1,57 @@
+# Config CRD instance for defect-diagnoser-agent — stage 1 of the defect lane
+# ([[Defect Lane Task Chain]]). Rendered by /launch-agent on 2026-09-27.
+#
+# NOT APPLIED. Applying is a production-touching operator decision:
+#   kubectlnukedev  -n dev  apply -f k8s/defect-diagnoser-agent-config.yaml
+#   (prod: copy with namespace: prod, image :prod, router -prod — after dev is green)
+#
+# Field values mirror the live sentry-collector-agent Config on nukedev (read 2026-09-27),
+# not the launch-agent template, whose registry / resources shape / LLM endpoint are stale.
+
+apiVersion: agent.benjamin-borbe.de/v1
+kind: Config
+metadata:
+  name: defect-diagnoser-agent
+  namespace: dev
+spec:
+  assignee: defect-diagnoser-agent
+  image: docker.prod.nuke.benjamin-borbe.de:443/defect-diagnoser-agent:dev
+  heartbeat: 15m
+  maxConcurrentJobs: 1
+  # Fleet naming rule ([[Agent Naming Convention]]): metadata.name == assignee == priorityClassName == secretName.
+  # The PriorityClass `defect-diagnoser-agent` does NOT exist yet — creating it is cluster-scoped and
+  # part of the gated deploy (peers: build-fix-agent, claude-agent — value 500, preemption Never).
+  priorityClassName: defect-diagnoser-agent
+
+  # task_type is the WORK SHAPE (defect-diagnose), not the repo name — per the page's contract.
+  taskTypes:
+    - defect-diagnose
+    - healthcheck
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  env:
+    # Live reads go ONLY through constrained read-only scripts (not yet written — domain work).
+    ALLOWED_TOOLS: "Read,Grep,Glob,Bash(scripts/vault-read.sh:*),Bash(scripts/vault-list.sh:*),Bash(scripts/prometheus-query.sh:*),Bash(scripts/pod-logs.sh:*),Bash(scripts/repo-clone.sh:*)"
+    LOGLEVEL: "2"
+    # LLM auth — fleet norm: stateless token via the in-cluster claude-code-router.
+    ANTHROPIC_BASE_URL: http://claude-code-router-dev:8788
+    ANTHROPIC_MODEL: MiniMax-M2.7-highspeed
+    # Task-file reads (read path 1), same endpoint the sentry-collector-agent uses.
+    GIT_REST_URL: http://vault-obsidian-personal:9090
+    # Metrics reads (read path 2).
+    PROMETHEUS_URL: http://prometheus.monitoring:9090
+
+  # Holds ANTHROPIC_AUTH_TOKEN (router token) — teamvault-resolved, see k8s/defect-diagnoser-agent-secret.yaml (not yet written).
+  secretName: defect-diagnoser-agent
+
+  # Pod logs/events (read path 3) need a dedicated read-only ServiceAccount `defect-diagnoser`
+  # (get/list on pods, pods/log, events, jobs, deployments; NO secrets/configmaps/exec).
+  # The Config CRD has no serviceAccount field in this template — how the executor assigns one
+  # to the Job is an open implementation question; the RBAC is production-touching and gated.

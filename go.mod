@@ -1,4 +1,4 @@
-module github.com/bborbe/agent-claude
+module github.com/bborbe/defect-diagnoser-agent
 
 go 1.27.1
 

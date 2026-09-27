@@ -1,11 +1,11 @@
 # Claude OAuth Setup
 
-The agent-claude runner uses Claude Code CLI which requires OAuth credentials.
-Credentials are stored on a PVC (`agent-claude`) mounted at `/home/claude/.claude`.
+The defect-diagnoser-agent runner uses Claude Code CLI which requires OAuth credentials.
+Credentials are stored on a PVC (`defect-diagnoser-agent`) mounted at `/home/claude/.claude`.
 
 ## Prerequisites
 
-- PVC `agent-claude` exists in the target namespace
+- PVC `defect-diagnoser-agent` exists in the target namespace
 - Apply if missing: `cd agent/agent/claude/k8s && make apply`
 
 ## Setup (one-time per namespace)
@@ -31,7 +31,7 @@ kubectlquant -n <NAMESPACE> run claude-setup --rm -it \
       "volumes": [{
         "name": "claude-data",
         "persistentVolumeClaim": {
-          "claimName": "agent-claude"
+          "claimName": "defect-diagnoser-agent"
         }
       }]
     }
@@ -85,7 +85,7 @@ kubectlquant -n <NAMESPACE> run claude-check --rm -it \
       "volumes": [{
         "name": "claude-data",
         "persistentVolumeClaim": {
-          "claimName": "agent-claude"
+          "claimName": "defect-diagnoser-agent"
         }
       }]
     }
