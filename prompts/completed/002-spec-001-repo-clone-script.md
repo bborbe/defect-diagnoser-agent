@@ -1,8 +1,13 @@
 ---
-status: approved
+status: completed
 spec: [001-read-only-observation-toolkit]
+summary: Added agent/scripts/repo-clone.sh, a read-only GitHub clone script with owner/name normalization, pre-git traversal and symlink containment guards, plus a stub-git Ginkgo suite, the /agent/repos/ gitignore line and a CHANGELOG entry
+execution_id: defect-diagnoser-agent-diagnose-v1-exec-002-spec-001-repo-clone-script
+dark-factory-version: dev
 created: "2026-09-27T22:45:00Z"
 queued: "2026-09-27T23:02:59Z"
+started: "2026-09-27T23:12:31Z"
+completed: "2026-09-27T23:24:40Z"
 branch: dark-factory/read-only-observation-toolkit
 ---
 
