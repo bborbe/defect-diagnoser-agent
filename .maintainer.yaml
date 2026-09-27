@@ -1,0 +1,8 @@
+prReviewer:
+  autoApprove: true
+release:
+  autoRelease: true
+autoMerge:
+  trivial: true
+goUpdate:
+  autoUpdate: true
