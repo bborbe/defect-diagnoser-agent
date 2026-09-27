@@ -4,7 +4,7 @@
 
 - **Input:** `## Observation` (operator's words only — no root cause, component or `file:line`)
 - **Output:** `## Verdict` yaml block — `defect_id`, `service`, `repo`, `file:line`, `root_cause`, `recommended_fix`, `evidence`, `confidence`
-- **Observes (read-only, in order):** task files → Prometheus → pod logs/events via its own read-only service account
+- **Observes (read-only, in order):** task files → Prometheus (Kubernetes API reads, deferred — see NEXT-DIRECTIONS v2)
 - **Escalates** (`needs_input`) instead of guessing when the defect cannot be reproduced or `confidence` is below High
 
 Scaffolded from the `bborbe/agent-claude` template via `/launch-agent` on 2026-09-27; the domain logic below the template scaffolding is not implemented yet.
@@ -44,7 +44,7 @@ To add a domain-specific agent that reuses this binary:
 
 ### Config CRD env pattern
 
-The `Config` CRD's `spec.env` map becomes pod env vars, which `main.go` consumes via struct tags. Example from `k8s/defect-diagnoser-agent-config.yaml`:
+The `Config` CRD's `spec.env` map becomes pod env vars, which `main.go` consumes via struct tags. Generic example (see `k8s/defect-diagnoser-agent-config.yaml` for the real values):
 
 ```yaml
 spec:
@@ -65,7 +65,11 @@ Prefer constrained `Bash(path:*)` forms over bare `Bash` to minimize shell attac
 
 ### Claude subprocess env allowlist
 
-`lib/claude/claude-runner.go` strips pod env down to a safe allowlist (`HOME,PATH,USER,TZ,...`) before spawning `claude`. Custom env vars (API URLs, credentials) **must** be threaded explicitly via `ClaudeRunnerConfig.Env map[string]string` in `main.go`. Don't expect pod env to reach Claude by default. See `docs/` for precedent (trade-analysis commit `1ccfa674cf`).
+`lib/claude/claude-runner.go` strips pod env down to a safe allowlist (`HOME,PATH,USER,TZ,...`) before spawning `claude`, so a variable visible in `kubectl describe pod` can still be absent from the subprocess. Custom env vars (API URLs, credentials) **must** be passed through `CLAUDE_ENV` — a comma-separated `KEY=VALUE` list set on the Config's `spec.env` (or `-claude-env` for a local run) and parsed by both entry points. Don't expect pod env to reach Claude by default.
+
+The observation scripts get their endpoints this way (contract: `docs/observation-scripts.md`):
+
+`CLAUDE_ENV: "GIT_REST_URL=http://vault-obsidian-personal:9090,PROMETHEUS_URL=http://prometheus.monitoring:9090"`
 
 ## Local Quick Test
 
@@ -91,6 +95,7 @@ Admin endpoints:
 
 - `pkg/prompts/` — embedded prompts (`workflow.md`, `output-format.md`)
 - `agent/.claude/CLAUDE.md` — default agent guardrails
+- `docs/observation-scripts.md` — contract for the read-only observation scripts
 - `docs/claude-oauth-setup.md` — seed PVC with Claude Code OAuth credentials
 - `lib/claude/` — shared prompt assembly + Claude CLI invocation
 - `lib/delivery/` — shared Kafka result publishing

@@ -37,21 +37,25 @@ spec:
       memory: 512Mi
 
   env:
-    # Live reads go ONLY through constrained read-only scripts (not yet written — domain work).
-    ALLOWED_TOOLS: "Read,Grep,Glob,Bash(scripts/vault-read.sh:*),Bash(scripts/vault-list.sh:*),Bash(scripts/prometheus-query.sh:*),Bash(scripts/pod-logs.sh:*),Bash(scripts/repo-clone.sh:*)"
+    # Live reads go ONLY through the constrained read-only scripts in agent/scripts/
+    # (read path 1 — task files, read path 2 — metrics). See docs/observation-scripts.md.
+    ALLOWED_TOOLS: "Read,Grep,Glob,Bash(scripts/vault-read.sh:*),Bash(scripts/vault-list.sh:*),Bash(scripts/prometheus-query.sh:*),Bash(scripts/repo-clone.sh:*)"
     LOGLEVEL: "2"
     # LLM auth — fleet norm: stateless token via the in-cluster claude-code-router.
     ANTHROPIC_BASE_URL: http://claude-code-router-dev:8788
     ANTHROPIC_MODEL: MiniMax-M2.7-highspeed
-    # Task-file reads (read path 1), same endpoint the sentry-collector-agent uses.
-    GIT_REST_URL: http://vault-obsidian-personal:9090
-    # Metrics reads (read path 2).
-    PROMETHEUS_URL: http://prometheus.monitoring:9090
+    # The Claude runner strips pod env down to a fixed allowlist (HOME,PATH,USER,TZ,...),
+    # so the read-path endpoints reach the scripts only through this channel: a
+    # comma-separated KEY=VALUE list parsed by both entry points (main.go and
+    # cmd/run-task/main.go). Set as plain pod env they would be dropped before the
+    # model ever sees them.
+    CLAUDE_ENV: "GIT_REST_URL=http://vault-obsidian-personal:9090,PROMETHEUS_URL=http://prometheus.monitoring:9090"
 
   # Holds ANTHROPIC_AUTH_TOKEN (router token) — teamvault-resolved, see k8s/defect-diagnoser-agent-secret.yaml (not yet written).
   secretName: defect-diagnoser-agent
 
-  # Pod logs/events (read path 3) need a dedicated read-only ServiceAccount `defect-diagnoser`
-  # (get/list on pods, pods/log, events, jobs, deployments; NO secrets/configmaps/exec).
-  # The Config CRD has no serviceAccount field in this template — how the executor assigns one
-  # to the Job is an open implementation question; the RBAC is production-touching and gated.
+  # Kubernetes API reads, deferred — see NEXT-DIRECTIONS v2. They need a dedicated read-only
+  # ServiceAccount `defect-diagnoser` (get/list on pods, pods/log, events, jobs, deployments;
+  # NO secrets/configmaps/exec). The Config CRD has no serviceAccount field in this template —
+  # how the executor assigns one to the Job is an open implementation question; the RBAC is
+  # production-touching and gated.

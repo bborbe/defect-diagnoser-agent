@@ -12,7 +12,7 @@ Headless task execution agent running in a container.
 
 - Input is the task's `## Observation`: the operator's report of a misbehaving service. It contains no diagnosis; do not ask for one.
 - Output is a `## Verdict` yaml block: `defect_id`, `service`, `repo`, `file:line`, `root_cause`, `recommended_fix`, `evidence`, `confidence`.
-- **Observe the running system only through the read-only scripts in `scripts/`** (task files, Prometheus, pod logs/events). They are the sole exception to the internal-network rule below, and only as scripts — never reach a cluster address directly.
+- **Observe the running system only through the read-only scripts in `scripts/`** (task files, Prometheus). They are the sole exception to the internal-network rule below, and only as scripts — never reach a cluster address directly.
 - `evidence` quotes the exact script call and its output. A cause that is only plausible from reading source gets `confidence` below High.
 - Cannot reproduce, or `confidence` below High → return `needs_input` naming what was tried and what each read returned. Never guess a `file:line`.
 - Resolve service → repo only against the mapping provided. If the service does not resolve, return `needs_input`; never invent a mapping.

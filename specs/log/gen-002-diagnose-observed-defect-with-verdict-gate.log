@@ -1523,3 +1523,738 @@ Constraints to copy from spec:
 - Frozen envelope.
 - Escalation mechanics are the framework's.
 - Phase cursor: wri…
+[01:24:46] $ cat >> /workspace/prompts/1-spec-002-verdict-gate.md <<'CHUNK'\n\n<constraints>\n\n- **Contract** ([[Defect Lane Task Chain]], amended 2026-09-27; copied into `docs/verdict-gate.md` because the conta…
+[01:24:46] [system: task_progress]
+[01:24:57] 💭 Now the verification section.
+
+Verification for prompt 1:
+```bash
+make test
+make precommit
+
+# the new package exists
+test -f pkg/verdict/verdict.go
+test -f pkg/verdict/gate.go
+test -f pkg/verdict/lineguard.go
+test -f pkg/verdict/step.go
+test -f pkg/verdict/verdict_suite_test.go
+
+# coverage on the new package
+go test -mod=mod -coverprofile=/tmp/verdict-cover.out ./pkg/verdict/...
+test "$(go tool cover -func=/tmp/verdict-cover.out | tail -1 | sed -E 's/.* ([0-9]+)\.[0-9]+%/\1/')" -ge 80
+
+# the lin…
+[01:25:01] $ cat >> /workspace/prompts/1-spec-002-verdict-gate.md <<'CHUNK'\n\n<verification>\n\nRun every line from the repo root. All must pass.\n\n```bash\nmake test          # the new pkg/verdict suite runs h…
+[01:25:01] [system: task_progress]
+[01:25:11] 💭 Confirmed: the house style ends at `</verification>` with no completion-report template. Good — prompt 1 is complete structurally.
+
+Now I need to add the HTML comments with open questions. The `<context>` block is the natural place (like spec-001 prompt 3 did). Let me insert them. But Edit is disabled, so I must append them somewhere, or insert via sed/python.
+
+Hmm — HTML comments should ideally go in `<context>` (as spec-001 prompt 3 did) so the reviewer sees them. But appending at the end of t…
+[01:25:12] Now inserting the open-question comments into prompt 1's `<context>`.
+
+
+[01:25:21] $ cd /workspace/prompts && python3 - <<'PY'\np='1-spec-002-verdict-gate.md'\ns=open(p).read()\nblock = '''\n<!-- Open questions for the reviewer — decisions taken here, each with the alternative:\n\n  …
+[01:25:21] [system: task_progress]
+[01:25:21] ⚠ [bash output]
+Traceback (most recent call last):
+  File "<stdin>", line 50, in <module>
+AssertionError: 2
+44267 /workspace/prompts/1-spec-002-verdict-gate.md
+[01:25:24] 💭 There are 2 occurrences of `\n</context>\n` — one is the closing tag of my context, and one is inside a code block? Hmm. Let me check: in the requirements I wrote a Go code block... no. Hmm, `</context>` appears in... Actually in requirement 12 I wrote `assert ...`? No.
+
+Wait — I wrote in requirement 4: nothing. Hmm. Let me search.
+
+Actually in `<context>` I have the line "Read these before writing anything:" and at the end `</context>`. And in the open-questions text I reference... no.
+
+Hmm, `<…
+[01:25:24] $ grep -n '</context>' /workspace/prompts/1-spec-002-verdict-gate.md
+[01:25:24] [system: task_progress]
+[01:25:28] 💭 Two `</context>` tags — the second one at line 67 is a bug: my `<context>` section was appended in two chunks and the second chunk ended with `</context>` too (the "framework facts" chunk). Let me look at lines 45-70.
+
+Actually, looking back: chunk 3 (context part 1) ended with `</context>`, and chunk 4 (framework facts) also ended with `</context>`. So there's a duplicate. I need to remove the first one (line 50) so the context block is contiguous.
+
+Wait — which is right? Line 50 closes context…
+[01:25:28] [read] /workspace/prompts/1-spec-002-verdict-gate.md (offset=44, limit=26)
+[01:25:28] [system: task_progress]
+[01:25:28]   → 25 lines read
+[01:25:32] 💭 Confirmed: line 50's `</context>` is spurious. I need to remove line 50 (and the blank line 49 can stay). Then insert the open-questions block before the real `</context>` at (then) line 66.
+
+Let me do it with python: delete the first `</context>` occurrence, then insert the block before the remaining one.
+
+Careful: after deleting line 50, the file has one `</context>`.
+
+Let me write python that:
+1. Removes the first occurrence of `\n</context>\n` (line 50's).
+2. Inserts the open-questions block…
+[01:25:39] $ cd /workspace/prompts && python3 - <<'PY'\np='1-spec-002-verdict-gate.md'\ns=open(p).read()\n# remove the spurious first </context>\ni = s.find('\n</context>\n')\nassert i != -1\ns = s[:i] + '\n' + s…
+[01:25:39] [system: task_progress]
+[01:25:45] 💭 Hmm, the last line count shows `</verification>` at line 474 but the file has more? `wc -c` 47427. Let me check the tail — the verification section should be last. Actually the `</verification>` at 474 and the file ends there presumably (there was a trailing blank). Let me confirm the structure is complete and in order: summary(23), objective(29), context(111), requirements(418), constraints(436), verification(474).
+
+Wait — that's wrong! The order should be summary, objective, context, requireme…
+[01:25:47] $ cd /workspace/prompts && grep -nE '^[0-9]+\. \*\*' 1-spec-002-verdict-gate.md | head -20; echo "=== boundary 108-115 ==="; sed -n '107,115p' 1-spec-002-verdict-gate.md; echo "=== boundary 46-52 ===";…
+[01:25:47] [system: task_progress]
+[01:25:47] ⚠ [bash output]
+414:13. **Coverage.** New code must reach at least 80 % statement coverage. Check with `go test -mod=mod -coverprofile=/tmp/verdict-cover.out ./pkg/verdict/...` then `go tool cover -func=/tmp/verdict-cover.out`. Test error paths, not only happy paths — every rule's `failed` and `needs_input` branch, every line-guard reason, and the `PrefixMessage` edge cases.
+416:14. **Self-check before finishing.** Re-run `<verification>` and confirm every line passes. Walk requirements 1–13 against the code you wrote: confirm every reason string in the pinned table appears character for character, confirm every "removed" outcome really filters `md.Sections` rather than a string copy, and confirm no message the binary generates can put a `#` at column 0. Then walk the spec's `## Acceptance Criteria` AC4–AC7 row by row against your test table and confirm each row is actually asserted — a table entry that asserts nothing about status or body does not count.
+=== boundary 108-115 ===
+        implementation and an interface would have no fake and no second implementation.
+        Reviewer: confirm this is acceptable against the repo's interface-per-collaborator
+        convention; if not, add `//counterfeiter:generate` and a fake with a consumer. -->
+
+</context>
+
+<requirements>
+
+Create a new package `pkg/verdict`. It owns every binary check this prompt adds. Nothing else in the repo changes: `pkg/factory` is wired in the last prompt of this spec, and `pkg/prompts` is a sibling prompt's deliverable.
+=== boundary 46-52 ===
+- `/home/node/.claude/plugins/marketplaces/coding/docs/go-precommit.md` — linter limits that apply to test files too (`funlen` 80 lines / 50 statements, `gocognit` 20, `nestif` 4, golines max-len 100, `dupl`).
+- `/home/node/.claude/plugins/marketplaces/coding/docs/go-patterns.md` — interface → constructor → struct, doc comments, error wrapping.
+- `/home/node/.claude/plugins/marketplaces/coding/docs/go-security-linting.md` — gosec expectations.
+
+**Framework facts, all verified while writing this prompt against `github.com/bborbe/agent v0.89.0` at `$(go env GOMODCACHE)/github.com/bborbe/agent@v0.89.0`.** Read these files before writing code:
+
+- `agent_step.go` — `type Step interface { Name() string; ShouldRun(ctx, *Markdown) (bool, error); Run(ctx, *Markdown) (*Result, error) }`. A `Result` carries `Status AgentStatus`, `NextPhase string`, `Message string`. The framework marshals the mutated `*Markdown` after each step's `Run` and publishes it through the `ResultDeliverer`, so the `*Markdown` **is** the delivered body.
+[01:25:50] 💭 Prompt 1 is structurally complete and correct. 
+
+Hmm — one thing: `sed -n` usage. It's fine.
+
+Note: prompt 1 is 47KB which is bigger than the spec-001 prompts (16-17KB). That's OK given the complexity, but let me consider whether it's over-long. The task said "Specificity over brevity — longer prompts are almost always better". Fine.
+
+Now, prompt 2. Let me write it incrementally too.
+
+Prompt 2: `prompts/2-spec-002-per-phase-prompts.md`
+
+Structure:
+- frontmatter
+- H1: `# Replace the scaffold prom…
+[01:25:50] Prompt 1 is complete. Now writing prompt 2.
+
+
+[01:25:54] [write] /workspace/prompts/2-spec-002-per-phase-prompts.md (1339 chars)
+[01:25:54] [system: task_progress]
+[01:25:54]   → File created successfully at: /workspace/prompts/2-spec-002-per-phase-prompts.md (file state is current in your context…
+[01:26:08] $ cat >> /workspace/prompts/2-spec-002-per-phase-prompts.md <<'CHUNK'\n\n<objective>\n\nGive each diagnoser phase instructions of its own. Today every phase shares one scaffold prompt that says nothing…
+[01:26:08] [system: task_progress]
+[01:26:10] 💭 Now the requirements for prompt 2. Let me append in chunks.
+
+Requirement 1: create the three .md files with specified content.
+Requirement 2: rewrite prompts.go.
+Requirement 3: delete workflow.md.
+Requirement 4: update pkg/factory/factory.go's CreateAgentFromRunner body.
+Requirement 5: rewrite prompts_test.go.
+Requirement 6: coverage / self-check.
+
+Let me append requirements 1 (planning.md content).
+[01:26:19] $ cat >> /workspace/prompts/2-spec-002-per-phase-prompts.md <<'CHUNK'\n\n<requirements>\n\n1. **Create `pkg/prompts/planning.md`.** Plain markdown, no XML wrapper, no frontmatter — it is embedded verba…
+[01:26:19] [system: task_progress]
+[01:26:21] 💭 Now requirements 3-6: ai_review.md, prompts.go, delete workflow.md, factory change, tests.
+
+Let me append.
+[01:26:35] $ cat >> /workspace/prompts/2-spec-002-per-phase-prompts.md <<'CHUNK'\n3. **Create `pkg/prompts/ai_review.md`.** It must contain the literal strings `## Observation` and `file:line`, and the literal se…
+[01:26:35] [system: task_progress]
+[01:26:45] 💭 Now constraints and verification for prompt 2.
+
+Constraints:
+- Contract fixed (field names/order, confidence values, escalation split, `## Observation` never rewritten).
+- Depends on spec 001 merged.
+- Do NOT add a confidence-threshold knob or gate opt-out.
+- Do NOT add `service_repo.` entries to any Config or code file — the prompts describe the *form* `service_repo.<service>`; they must not hard-code a mapping entry.
+- No pod-log reads; no pod-logs.sh.
+- No change to the bborbe/agent module.
+-…
+[01:26:57] $ cat >> /workspace/prompts/2-spec-002-per-phase-prompts.md <<'CHUNK'\n\n<constraints>\n\n- **Contract** ([[Defect Lane Task Chain]], amended 2026-09-27; copied into `docs/verdict-gate.md` because the …
+[01:26:57] [system: task_progress]
+[01:27:03] 💭 I made a typo: I wrote `test "$(grep -c 'claudelib.NewAgentStep' pkg/factory/factory.go)" = "3"` — wait, I wrote `claudelib.NewAgentStep` but let me check: I wrote
+
+```
+test "$(grep -c 'claudelib.NewAgentStep' pkg/factory/factory.go)" = "3"
+```
+
+Hmm, in the heredoc I typed `grep -c 'claudelib.NewAgentStep'`. Let me verify — I typed `test "$(grep -c 'claudelib.NewAgentStep' pkg/factory/factory.go)" = "3"`. Hmm, actually I wrote `claudelib.NewAgentStep` in one place and... let me check the file.
+
+…
+[01:27:04] $ grep -n "NewAgentStep" /workspace/prompts/2-spec-002-per-phase-prompts.md
+[01:27:04] [system: task_progress]
+[01:27:10] 💭 Line 212 is correct: `grep -c 'claudelib.NewAgentStep'` = 3. Good — no typo. (The `claudelib` alias is what factory.go uses.)
+
+Now I need to insert the open-question comments into prompt 2's context. Let me add them before `</context>` (line 57).
+
+Open questions for prompt 2:
+1. `BuildInstructions(phase)` replaces the zero-arg scaffold builder. The spec pins the *tests* to be replaced but not the function name/signature; this prompt keeps the name `BuildInstructions` with a phase parameter so th…
+[01:27:17] $ cd /workspace/prompts && python3 - <<'PY'\np='2-spec-002-per-phase-prompts.md'\ns=open(p).read()\nblock = '''\n<!-- Open questions for the reviewer — decisions taken here, each with the alternative:\…
+[01:27:17] [system: task_progress]
+[01:27:21] 💭 Prompt 2 done. Now prompt 3.
+
+Prompt 3: `prompts/3-spec-002-wiring-dispatch-and-docs.md`
+
+Contents:
+- frontmatter
+- H1: `# Wire the diagnoser: dispatch, phase chain, README mapping and changelog`
+- summary
+- objective
+- context
+- requirements
+- constraints
+- verification
+
+Requirements:
+1. Extend `CreateAgentFromRunner(runner, agentDir, envContext)` — new agentDir param; build the gate with `verdict.NewGate(envContext, filepath.Join(string(agentDir), "repos"))`; wrap each phase step with the verd…
+[01:27:21] Prompt 2 is complete. Now writing prompt 3.
+
+
+[01:27:25] [write] /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md (1229 chars)
+[01:27:25] [system: task_progress]
+[01:27:25]   → File created successfully at: /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md (file state is current in your …
+[01:27:38] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n\n<objective>\n\nJoin the two halves this spec built. The verdict gate and the line guard exist as agent steps after prompt…
+[01:27:38] [system: task_progress]
+[01:27:40] 💭 Continue with the verified facts + AC10 note, then close context.
+[01:27:50] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n**Verified facts about the current code, read while writing this prompt:**\n\n- `pkg/factory/factory.go` declares `const se…
+[01:27:50] [system: task_progress]
+[01:27:53] 💭 Now the requirements for prompt 3. Let me append in chunks.
+
+Requirement 0 (sentinel), 1 (seam signature + gate wiring), 2 (CreateAgent), 3 (dispatch), 4 (factory_test updates), 5 (AC2 tests), 6 (AC3 tests a-j), 7 (README), 8 (CHANGELOG), 9 (AC9 greps), 10 (self-check).
+
+Let me append requirements 0-3.
+[01:28:04] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n\n<requirements>\n\n0. **Fail-loud sentinels for the cross-prompt boundary.** Before writing anything, confirm `pkg/verdict…
+[01:28:04] [system: task_progress]
+[01:28:05] 💭 Now requirements 4-6: factory_test updates, AC2 tests, AC3 tests.
+
+Let me append.
+[01:28:18] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n4. **Update the existing dispatch specs** in `pkg/factory/factory_test.go` so they describe the new table. The three that c…
+[01:28:18] [system: task_progress]
+[01:28:20] 💭 Now the AC3 case table (a)-(j). Let me append it.
+[01:28:30] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n   **The ten cases.** Implement each as its own spec (a `DescribeTable` over a case struct is fine, as long as each row ass…
+[01:28:30] [system: task_progress]
+[01:28:34] 💭 Now requirements 7-9: README, CHANGELOG, AC9 greps, self-check.
+
+Let me append.
+[01:28:40] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n7. **README — document the mapping input.** Add a `### Service → repo mapping` subsection under `### Config CRD env pattern…
+[01:28:40] [system: task_progress]
+[01:28:59] 💭 Oops — requirement 9 says "the Setup block still carries a `service_repo.` entry" — but wait, I need to double check: I said "Confirm with the `<verification>` greps". That's fine.
+
+Hmm — but there's an issue: requirement 9 says "scenarios/001... was already updated alongside this spec" and "Do not edit it". Good — matches the spec.
+
+Now constraints and verification for prompt 3.
+
+Constraints:
+- Contract fixed.
+- Gate rules frozen.
+- Frozen envelope.
+- Escalation mechanics are the framework's.
+-…
+[01:29:07] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n\n<constraints>\n\n- **Contract** ([[Defect Lane Task Chain]], amended 2026-09-27; copied into `docs/verdict-gate.md` becau…
+[01:29:07] [system: task_progress]
+[01:29:08] 💭 Now verification for prompt 3.
+
+Note: I must not include git commands. `sed -n` on scenarios is fine.
+
+Let me append.
+[01:29:15] $ cat >> /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md <<'CHUNK'\n\n<verification>\n\nRun every line from the repo root. All must pass.\n\n```bash\nmake test          # the new dispatch and…
+[01:29:15] [system: task_progress]
+[01:29:23] 💭 There's a bug in my verification: 
+
+```bash
+test -z "$(find agent/repos -mindepth 1 2>/dev/null)"
+```
+
+That's fine. And:
+```bash
+! grep -rn 'agent/repos' pkg/factory/
+```
+Hmm — the phase-chain tests create a temp clone root `<tmp>/repos/...`. The string `agent/repos` wouldn't appear. But wait: prompt 1's constraint says tests must never use `agent/repos`. For prompt 3, the same. Good.
+
+Hmm — but careful: `! grep -rn 'agent/repos' pkg/factory/` — if `pkg/factory` tests reference `agent/repos` in …
+[01:29:31] $ cd /workspace/prompts && python3 - <<'PY'\np='3-spec-002-wiring-dispatch-and-docs.md'\ns=open(p).read()\nblock = '''\n<!-- Open questions for the reviewer — decisions taken here, each with the altern…
+[01:29:31] [system: task_progress]
+[01:29:43] 💭 All three files written. Now let me do a final QA pass:
+
+1. Verify the `\\.` in the comment renders as `\.` — I wrote `'service_repo\\.'` in python within a single-quoted heredoc... Actually the python string was a triple-quoted regular string, and I wrote `\\.` which becomes `\.` in the output. Good.
+
+2. Check the structural integrity of all three (tag pairs in order).
+
+3. Check for forbidden things:
+   - No `git ` commands in verification.
+   - No `docker`, `kubectl`, `dark-factory`, `scripts/…
+[01:29:44] Final QA pass. Let me fix two alignment-brittle greps and audit for forbidden tokens.
+
+
+[01:29:47] $ cd /workspace/prompts && python3 - <<'PY'\np='3-spec-002-wiring-dispatch-and-docs.md'\ns=open(p).read()\na="grep -qF 'agentlib.TaskTypeHealthcheck: livenessAgent' pkg/factory/factory.go"\nb="grep -qF…
+[01:29:47] [system: task_progress]
+[01:29:52] 💭 The forbidden-token check on prompt 2's verification flagged `scripts/*.sh` mentions — but those are `grep -qF 'scripts/repo-clone.sh' pkg/prompts/planning.md`, i.e. grepping a file for a string, not executing the script. That's a filesystem check, which is explicitly container-safe. Fine.
+
+The deliberation-prose grep hit only log files (the daemon's logs), not my prompt files. Good.
+
+Hmm — important: the log file mentions `Wait — there's a /workspace/tmpcheck/main.go directory. That's odd — tmp…
+[01:29:53] $ ls -d /workspace/tmpcheck 2>&1; echo "=== go.mod yaml.v3 ==="; grep -n "yaml.v3" /workspace/go.mod; echo "=== deliberation in my three files ==="; cd /workspace/prompts && grep -nE 'Wait —|Actually —…
+[01:29:53] [system: task_progress]
+[01:29:56] 💭 tmpcheck is gone, go.mod is reverted, and no deliberation prose in my files.
+
+Now let me do a final structural check on all three files and confirm the requirements numbering, and that each prompt ends with `</verification>`.
+
+Also — I want to double check prompt 1's `<requirements>` starts correctly (I appended "Create a new package `pkg/verdict`..." right after `<requirements>`).
+
+And verify the open-question comments are inside `<context>`.
+
+Let me do a final structural summary.
+[01:29:58] $ cd /workspace/prompts && for f in 1-spec-002-verdict-gate.md 2-spec-002-per-phase-prompts.md 3-spec-002-wiring-dispatch-and-docs.md; do\n  echo "=== $f ($(wc -l < $f) lines, $(wc -c < $f) bytes)"\n  …
+[01:29:58] [system: task_progress]
+[01:29:58] ⚠ [bash output]
+23:<objective>
+27:</objective>
+29:<context>
+114:</context>
+116:<requirements>
+230:</requirements>
+232:<constraints>
+250:</constraints>
+252:<verification>
+260:# AC2 — the seam exists and CreateAgent delegates to it
+264:# the dispatch table has the new task type and no longer accepts llm
+270:# AC9 — README documents the mapping form and links the rule set
+274:# AC9 — no mapping entry is committed to the Config
+277:# AC9 — scenario 001 already carries both edits; this prompt only confirms them
+281:# AC9 — the changelog records the change, and the README keeps no pod-log claim
+285:# the factory tests leave no clone behind and never touch the shared local one
+289:# changed code reaches at least 80% statement coverage
+294:</verification>
+  open-question comment blocks: 1
+  last line: </verification>
+[01:30:25] 💭 All three prompts are structurally complete: frontmatter (spec/status/created/branch), H1 title, summary, objective, context (with the open-questions HTML comment), requirements, constraints, verification — each ending with `</verification>`, matching house style.
+
+One thing to double-check: prompt 1's `<summary>` and prompt 3's `<summary>` — the H1 comes BEFORE `<summary>`. In the spec-001 prompts, the order was: frontmatter, `# Title`, `<summary>`. ✓ Matches.
+
+Hmm — one issue: the prompt-writi…
+[01:30:55] All three prompt files are written and structurally verified.
+
+## Files created
+
+- `/workspace/prompts/1-spec-002-verdict-gate.md` (474 lines) — model-output heading rule, verdict gate rules a–j, ai_review re-gate, line guard, stale-`## Failure` removal, all as step wrappers. Covers AC4–AC7.
+- `/workspace/prompts/2-spec-002-per-phase-prompts.md` (261 lines) — `pkg/prompts/planning.md` / `execution.md` / `ai_review.md`, phase-aware `BuildInstructions`, deletion of `workflow.md`, three distinct factory steps. Covers AC8.
+- `/workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md` (294 lines) — `agentDir` on the runner seam, gate wrapping, `defect-diagnose` in / `llm` out, the ten-case wired phase-chain test matrix, README mapping section, CHANGELOG. Covers AC2, AC3, AC9.
+
+Execution order is 1 → 2 → 3 (`make precommit` gates every one; AC1 is in each prompt's `<verification>`).
+
+## Key decisions
+
+1. **New package `pkg/verdict`** holds everything prompt 1 adds. Pinned exported API: `NewGate(envContext, cloneRoot) *Gate`, `(*Gate).Evaluate` (rules a–j), `(*Gate).Review` (rules a–j again, then the ai_review line guard), `CheckLineGuard`, `PrefixMessage`, and `NewPlanningStep` / `NewExecutionStep(inner, gate)` / `NewAIReviewStep(inner, gate)`. A follow-up prompt in the spec wires exactly these names.
+2. **`Gate` is a concrete struct, not an interface** — no counterfeiter fake, because every test drives the real deterministic gate and an interface would have no second implementation. Flagged as an open question.
+3. **Section removal is a filter over `md.Sections`**, never string surgery, and the gate itself performs it on every "removed" outcome. `Decision` therefore carries only `Status` + `Message`.
+4. **Prefixing happens exactly once, in the step wrapper**, so model-passthrough envelopes and gate-generated messages share one path. `Decision.Message` stays raw; `PrefixMessage` is the only prefixing step. This is what makes the `> `-form assertions land on the delivered message rather than on the gate.
+5. **`Evaluate` vs `Review`** splits rule k's meaning by phase: `Evaluate`'s `Done` = "advance to ai_review", `Review`'s `Done` = "the line guard passed, complete".
+6. **Prompt 2 changes the *body* of `CreateAgentFromRunner`** (three per-phase steps) so the repo stays compiling after `workflow.md` is deleted; **prompt 3 adds the parameter, the gate wrapping and the dispatch**. Flagged as an open question because it deviates from the spec's decomposition table.
+7. **Prompt 3 owns the only `## Unreleased` entry**; prompts 1 and 2 state explicitly that they must not add one, because AC9 greps for it.
+8. **AC10 is excluded** from every `<verification>` — mentioned once in prompt 3's `<context>` as the spec's operator rung, with no commands.
+9. **Pinned reason strings** for every rule (a table in prompt 1), so the tests assert them character for character instead of the executor inventing wording.
+10. **No git / docker / kubectl / dark-factory / operator-note blocks** anywhere in the verification or constraints — `.dark-factory.yaml` is `workflow: direct` with no `hideGit`, but `/workspace` has no `.git` at all, so all AC checks are grep- and `make`-based.
+
+## Verification work done before writing
+
+- Grepped `github.com/bborbe/agent@v0.89.0` for the real signatures used: `Step`, `Markdown`/`Section`/`FindSection`, `TaskFrontmatter.String`, `Agent.Run`'s in-process phase walk, `claude.NewAgentStep`'s `ReplaceSection` + envelope handling, `NewAgentProvider`'s error text, `TaskType` constants, `delivery.NewPassthroughContentGenerator`, and `mocks.ClaudeRunner`'s `RunReturns` / `RunReturnsOnCall` / `RunCallCount` / `RunArgsForCall`. No `defect-diagnose` constant exists upstream, so prompt 3 declares one locally.
+- Ran two throwaway programs to confirm load-bearing behaviour, then deleted them: `gopkg.in/yaml.v3` parses `file:line: pkg/x/y.go:42` with key `file:line`, and a block scalar yields a value containing `\n`; `agentlib.ParseMarkdown` splits at every column-0 `## ` line (so an injected `## Verdict` becomes a second section — the exact forgery the heading rule must catch pre-parse); the passthrough generator splices `## Failure` from `result.Message` inside a fence.
+- **Reverted a `go.mod` side effect**: my scratch program promoted `gopkg.in/yaml.v3` from indirect to direct. It is back as `// indirect`; `go.sum` was untouched and the scratch directory is gone.
+
+## Open questions embedded as comments
+
+**Prompt 1** (7): pinned explicit messages for the section-missing / no-block / unparseable rows where AC4 says "naming the field" but no field exists; rule e deliberately does not echo the value (that is what makes AC4's `/abs/x.go:3`-absent assertion hold); the line guard quotes the **path** for `resolves outside the clone` / `not found in clone` but **path:line** for `beyond end of file`, read literally from the docs; AC5's "each prefixed `> `" is asserted at the delivered-message level because the prefix is applied once at the step boundary; the deepest-existing-ancestor walk is needed so a dangling directory escape still reports `resolves outside the clone`; the `service_repo.` literal is the lookup prefix, not a mapping entry, despite the Non-goal's wording; `Gate` is a concrete struct.
+
+**Prompt 2** (6): keeping the name `BuildInstructions` with a phase parameter rather than adding a second builder; a silent one-element fallback for an unknown phase instead of an error path through the factory; changing `CreateAgentFromRunner`'s body here rather than in prompt 3 (compile-green requirement); both planning and ai_review name `scripts/repo-clone.sh`, and all four names used are allowlisted so spec 001's consistency test needs no change; AC8's strings are asserted on `Instructions.String()`'s rendered form, which is what the model receives; `output-format.md` is kept and embedded for all three phases.
+
+**Prompt 3** (8): `CreateAgentFromRunner` gains `agentDir` because the clone root is unreachable through the `claude.ClaudeRunner` interface; AC3 is a factory-level matrix because only the real content generator produces "the written task"; the "exactly two prompts" assertions use `RunCallCount()`; the fixture sets `trigger_count: 1` / `max_triggers: 3` so the `failed` case keeps its assignee; the new tests construct `service_repo.<service>` keys in a local `envContext` — the only way to exercise rules h and i, and a direct tension with the Non-goal that the reviewer should confirm; README section placement is a readability choice; AC2's liveness assertion drives the liveness agent with the same fake; removing `llm` necessarily rewrites the accepted-types assertion to `[defect-diagnose healthcheck oauth-probe]`, which is read as excluded from "all other existing tests keep passing".
+
+## Docs referenced in `<context>`
+
+Project: `docs/verdict-gate.md`, `docs/observation-scripts.md`, `docs/dod.md`, `agent/.claude/CLAUDE.md`, `README.md`, `CHANGELOG.md`, `scenarios/001-diagnose-one-observed-defect.md`, the two in-progress spec files, and the relocated spec-001 prompts (`prompts/completed/001-spec-001-http-observation-scripts.md`, `prompts/in-progress/002-…` and `003-…`).
+Coding plugin (in-container paths only): `go-testing-guide.md`, `go-error-wrapping-guide.md`, `go-precommit.md`, `go-patterns.md`, `go-security-linting.md`, `go-factory-pattern.md`, `go-doc-best-practices.md`, `changelog-guide.md`.
+
+## Pattern note
+
+No reusable pattern was inlined that lacks a doc. One small suggestion: the Ginkgo suite-file boilerplate (`time.Local = time.UTC`, `format.TruncatedDiff = false`, 60 s suite timeout, `RunSpecs`) is now repeated across `pkg/scripts`, `pkg/factory`, `pkg/prompts` and `pkg/verdict`. Spec 001's prompt inlined it verbatim; these prompts reference `pkg/factory/factory_suite_test.go` as the shape instead. A short `go-ginkgo-suite-file.md` in the coding docs would remove the last reason to inline it.
+
+Run `/dark-factory:audit-prompt <file>` on each of the three before approving.
+[01:30:55] [system: background_tasks_changed]
+[01:30:55] [system: task_updated]
+[01:30:55] [system: task_notification]
+[01:30:55] [init] session=d0a8f161 model=deepseek-v4-flash[1m] cwd=/workspace tools=23
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] [system: thinking_tokens]
+[01:30:57] 💭 The agent completed. Let me verify the files exist and check that go.mod wasn't left modified (it claims it reverted).
+
+Then run the prompt-auditor agent on each of the three files.
+
+Let me verify files first, then launch three auditors in parallel.
+[01:30:58] The agent completed. Let me verify the files landed and that its claimed `go.mod` revert is real, then run the audit pass.
+
+
+[01:30:58] $ ls -la /workspace/prompts/; echo "=== line counts ==="; wc -l /workspace/prompts/*.md 2>/dev/null; echo "=== go.mod yaml.v3 line ==="; grep -n "yaml.v3" /workspace/go.mod
+[01:30:59] [system: thinking_tokens]
+[01:30:59] [system: thinking_tokens]
+[01:30:59] [system: thinking_tokens]
+[01:30:59] [system: thinking_tokens]
+[01:30:59] [system: thinking_tokens]
+[01:30:59] [system: thinking_tokens]
+[01:30:59] [system: thinking_tokens]
+[01:30:59] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:00] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:01] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:02] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:03] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:04] [system: thinking_tokens]
+[01:31:05] [system: thinking_tokens]
+[01:31:05] [system: thinking_tokens]
+[01:31:05] [system: thinking_tokens]
+[01:31:05] [system: thinking_tokens]
+[01:31:05] [system: thinking_tokens]
+[01:31:05] 💭 All three files exist, go.mod is clean (yaml.v3 still indirect).
+
+Now run prompt-auditor on each of the three files. Launch three in parallel, in background. But I need their results to report. The command says collect each audit report.
+
+Let me launch all three in parallel in a single message. I'll run them in background (default) and wait for all three notifications.
+
+Actually, since my next action depends on all three, but running three in parallel is the point. Background is fine — I'll get …
+[01:31:05] All three files are in place and `go.mod` is clean. Now the audit pass — launching all three auditors concurrently.
+
+
+[01:31:12] [agent:dark-factory:prompt-auditor] Audit prompt 1
+    prompt: Audit this dark-factory prompt file against the Prompt Definition of Done:\n\n`prompts/1-spec-002-verdict-gate.md`\n\nIt was generated from the spec `specs/in-…
+[01:31:12] [system: task_started]
+[01:31:12] [agent:dark-factory:prompt-auditor] Audit prompt 2
+    prompt: Audit this dark-factory prompt file against the Prompt Definition of Done:\n\n`prompts/2-spec-002-per-phase-prompts.md`\n\nIt was generated from the spec `spec…
+[01:31:12] [system: task_started]
+[01:31:12] [agent:dark-factory:prompt-auditor] Audit prompt 3
+    prompt: Audit this dark-factory prompt file against the Prompt Definition of Done:\n\n`prompts/3-spec-002-wiring-dispatch-and-docs.md`\n\nIt was generated from the spe…
+[01:31:12] [system: task_started]
+[01:31:15] [system: task_progress]
+[01:31:15] $ pwd && ls -la
+[01:31:15] [system: task_progress]
+[01:31:15] [read] /workspace/prompts/2-spec-002-per-phase-prompts.md
+[01:31:15]   → 261 lines read
+[01:31:15] [system: task_progress]
+[01:31:15] [read] /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md
+[01:31:15] [system: task_progress]
+[01:31:15] [read] /workspace/specs/in-progress/002-diagnose-observed-defect-with-verdict-gate.md
+[01:31:15]   → 294 lines read
+[01:31:15] [system: task_progress]
+[01:31:15] [read] /workspace/prompts/1-spec-002-verdict-gate.md
+[01:31:15] [system: task_progress]
+[01:31:15] [read] /workspace/specs/in-progress/002-diagnose-observed-defect-with-verdict-gate.md
+[01:31:15] [system: task_progress]
+[01:31:15] $ ls -la && echo "---MOUNTS---" && (dark-factory config 2>&1 || echo "dark-factory CLI unavailable") && echo "---YAML---" && (cat .dark-factory.yaml 2>&1 || echo "no .dark-factory.yaml")
+[01:31:15]   → 284 lines read
+[01:31:15]   → 474 lines read
+[01:31:16]   → 284 lines read
+[01:31:19] [system: task_progress]
+[01:31:19] $ cat .dark-factory.yaml; echo "=== config ==="; dark-factory config 2>&1 | head -60; echo "=== prompts dir ==="; ls -la prompts/ prompts/completed/ prompts/in-progress/ 2>&1; echo "=== specs ==="; ls …
+[01:31:19] [system: task_progress]
+[01:31:19] [read] /workspace/specs/in-progress/002-diagnose-observed-defect-with-verdict-gate.md
+[01:31:20]   → 284 lines read
+[01:31:20] [system: task_progress]
+[01:31:20] $ pwd && ls -la && echo "--- config ---" && (dark-factory config 2>&1 | head -50 || echo "dark-factory not available")
+[01:31:20] [system: task_progress]
+[01:31:20] [read] /workspace/prompts/1-spec-002-verdict-gate.md
+[01:31:20] [system: task_progress]
+[01:31:20] [read] /workspace/prompts/2-spec-002-per-phase-prompts.md
+[01:31:20]   → 261 lines read
+[01:31:20]   → 474 lines read
+[01:31:25] [system: task_progress]
+[01:31:25] $ echo "=== .dark-factory.yaml ===" && cat /workspace/.dark-factory.yaml && echo && echo "=== prompts dir ===" && ls -la /workspace/prompts/ && echo && echo "=== prompts/in-progress ===" && ls -la /wor…
+[01:31:25] [system: task_progress]
+[01:31:25] [read] /workspace/pkg/factory/factory.go
+[01:31:25]   → 149 lines read
+[01:31:25] [system: task_progress]
+[01:31:25] [read] /workspace/prompts/1-spec-002-verdict-gate.md
+[01:31:25] [system: task_progress]
+[01:31:25] [read] /workspace/pkg/prompts/prompts.go
+[01:31:25] [system: task_progress]
+[01:31:25] [read] /workspace/pkg/prompts/prompts_test.go
+[01:31:25] [system: task_progress]
+[01:31:25] [read] /workspace/pkg/prompts/workflow.md
+[01:31:25] [system: task_progress]
+[01:31:25] [read] /workspace/pkg/prompts/output-format.md
+[01:31:25] [system: task_progress]
+[01:31:25] [read] /workspace/pkg/prompts/prompts_suite_test.go
+[01:31:25]   → 27 lines read
+[01:31:25]   → 31 lines read
+[01:31:25]   → 23 lines read
+[01:31:25]   → 16 lines read
+[01:31:25]   → 19 lines read
+[01:31:25]   → 474 lines read
+[01:31:25] [system: task_progress]
+[01:31:25] $ echo "=== docs ===" && ls -la docs/ && echo "=== pkg ===" && ls -la pkg/ && echo "=== pkg/factory ===" && ls -la pkg/factory/ 2>&1 && echo "=== agent ===" && ls -la agent/ && echo "=== prompts ===" &…
+[01:31:25] [system: task_progress]
+[01:31:25] $ echo "=== hideGit/workflow ===" && grep -nE 'hideGit|workflow' .dark-factory.yaml; echo "=== coding docs dir ==="; ls -la /home/node/.claude/plugins/marketplaces/coding/docs/ 2>&1 | head -50; echo "=…
+[01:31:25] ⚠ [bash output]
+-rw-r--r-- 1 node node 10631 Aug 23 22:06 go-http-service-guide.md
+-rw-r--r-- 1 node node 15828 Aug 23 22:06 go-json-error-handler-guide.md
+-rw-r--r-- 1 node node 11267 Aug 23 22:06 go-k8s-binary-conventions.md
+-rw-r--r-- 1 node node 26720 Aug 23 22:06 go-kubernetes-crd-controller-guide.md
+-rw-r--r-- 1 node node  3288 Aug 23 22:06 go-library-guide.md
+-rw-r--r-- 1 node node 11125 Aug 23 22:06 go-licensing-guide.md
+-rw-r--r-- 1 node node 16156 Aug 23 22:06 go-linting-guide.md
+-rw-r--r-- 1 node node 20048 Aug 23 22:06 go-logging-guide.md
+-rw-r--r-- 1 node node  8491 Aug 23 22:06 go-makefile-commands.md
+-rw-r--r-- 1 node node 33564 Aug 23 22:06 go-mocking-guide.md
+-rw-r--r-- 1 node node  8546 Aug 23 22:06 go-mod-dependency-fix-guide.md
+-rw-r--r-- 1 node node  5189 Aug 23 22:06 go-mod-replace-guide.md
+-rw-r--r-- 1 node node  6857 Aug 23 22:06 go-package-layout-guide.md
+-rw-r--r-- 1 node node  9828 Aug 23 22:06 go-parse-pattern.md
+=== global CLAUDE.md ===
+-rw-r--r-- 1 node node 22240 Apr 26 11:22 /home/node/.claude/CLAUDE.md
+=== GOMODCACHE ===
+/home/node/go/pkg/mod
+=== agent mod version ===
+10:	github.com/bborbe/agent v0.89.0
+[01:31:28] [system: task_progress]
+[01:31:28] [read] /workspace/pkg/factory/factory.go
+[01:31:28] [system: task_progress]
+[01:31:28] [read] /workspace/prompts/3-spec-002-wiring-dispatch-and-docs.md
+[01:31:28] [system: task_progress]
+[01:31:28] [read] /workspace/prompts/in-progress/003-spec-001-config-allowlist-and-consistency.md
+[01:31:28]   → 149 lines read
+[01:31:28]   → 207 lines read
+[01:31:28]   → 294 lines read
+[01:31:32] [system: task_progress]
+[01:31:32] [read] /workspace/docs/verdict-gate.md
+[01:31:32] [system: task_progress]
+[01:31:32] [read] /workspace/docs/observation-scripts.md
+[01:31:32] [system: task_progress]
+[01:31:32] [read] /workspace/docs/dod.md
+[01:31:32] [system: task_progress]
+[01:31:32] [read] /workspace/agent/.claude/CLAUDE.md
+[01:31:32]   → 45 lines read
+[01:31:32]   → 113 lines read
+[01:31:32]   → 70 lines read
+[01:31:32]   → 27 lines read
+[01:31:42] [unknown type: tool_progress]
+[01:31:42] [unknown type: tool_progress]
+[01:31:42] [unknown type: tool_progress]
+[01:31:53] [system: task_progress]
+[01:31:53] $ cd /workspace\necho "=== CreateAgentFromRunner call sites ==="\ngrep -rn 'CreateAgentFromRunner' --include=*.go . | grep -v vendor\necho\necho "=== factory test files ==="\nls -la pkg/factory/\necho\…
+[01:31:53] [system: task_progress]
+[01:31:53] $ cd /workspace\necho "=== docs/verdict-gate.md headings ==="\ngrep -n '^#' docs/verdict-gate.md\necho\necho "=== docs/observation-scripts.md headings ==="\ngrep -n '^#' docs/observation-scripts.md\nec…
+[01:31:53] ⚠ [bash output]
+## Pass criteria
+
+- [ ] Task reaches `status: completed` with no `## Failure` section
+- [ ] `file:line` resolves: `git -C <clone> show <ref>:<path> | sed -n '<line>p'` prints a non-empty line (the pod's clone is ephemeral, so `<clone>` is a local clone of the verdict's `repo`, and `<ref>` is the `head_sha` recorded in the task's `## Plan`)
+- [ ] `evidence` quotes a script call **and its output**, and that output shows the observed misbehaviour
+- [ ] The `## Observation` still contains no root cause, component, or `file:line` (operator supplied no diagnosis)
+- [ ] No agent-pipeline alerts fired in the 10 min after completion
+
+## Fail recovery
+
+If the task fails (`## Failure`, or `assignee: ""`):
+1. Read the `## Failure` / escalation reason for the error class
+2. Common classes: transient infra (retry), missing script or env (preflight gap — see [[Fail-Fast Preflight for Tool-Dependent LLM Agents]]), service did not resolve to a repo (mapping gap — escalate, do not invent), defect not reproducible (expected `needs_input`)
+3. Re-trigger: `vault-cli task set "<title>" assignee defect-diagnoser-agent`
+
+## Related
+
+- [[Defect Diagnoser Agent]] — agent knowledge page
+- [[Defect Lane Task Chain]] — the contract this agent implements
+- [[Agent Pipeline Debug Guide]]
+[01:31:54] [system: task_progress]
+[01:31:54] $ cd /workspace\necho "=== pkg/prompts ==="; ls -la pkg/prompts/; echo; echo "=== agent/.claude ==="; ls -la agent/.claude/; echo; echo "=== docs/dod.md ==="; cat docs/dod.md; echo; echo "=== mocks/moc…
+[01:31:54] [system: task_progress]
+[01:31:54] $ cd /workspace\necho "=== coding docs existence ==="\nfor f in go-testing-guide.md go-error-wrapping-guide.md go-precommit.md go-patterns.md go-security-linting.md; do\n  test -f "/home/node/.claude/p…
+[01:31:54] ⚠ [bash output]
+
+package factory_test
+
+import (
+	"testing"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
+)
+
+func TestSuite(t *testing.T) {
+	time.Local = time.UTC
+	format.TruncatedDiff = false
+	RegisterFailHandler(Fail)
+	suiteConfig, reporterConfig := GinkgoConfiguration()
+	suiteConfig.Timeout = 60 * time.Second
+	RunSpecs(t, "Factory Suite", suiteConfig, reporterConfig)
+}
+[01:31:54] ⚠ [bash output]
+command
+commands
+delivery
+docs
+envparse
+go.mod
+go.sum
+hack
+healthcheck
+helm
+lib_suite_test.go
+metrics
+mocks
+pi
+prompts
+scenarios
+skills
+specs
+stats3.py
+tools.env
+[01:32:04] [system: task_progress]
+[01:32:04] $ M=/home/node/go/pkg/mod/github.com/bborbe/agent@v0.89.0\necho "=== Step interface ==="; grep -n -A 8 'type Step interface' $M/agent_step.go\necho "=== Result struct ==="; grep -n -A 12 'type Result s…
+[01:32:04] [system: task_progress]
+[01:32:04] $ M=/home/node/go/pkg/mod/github.com/bborbe/agent@v0.89.0\necho "=== AgentStatus consts ==="; grep -n 'AgentStatus\(Done\|Failed\|NeedsInput\)\s*=\|AgentStatusDone\|AgentStatusFailed\|AgentStatusNeedsI…
+[01:32:04] ⚠ [bash output]
+=== Section struct ===
+26:type Section struct {
+27-	Heading string
+28-	Body    string
+29-}
+30-
+31-// Markdown is a parsed task document: frontmatter + preamble (text before
+32-// the first section) + ordered list of sections.
+=== FindSection / RemoveSection / ReplaceSection ===
+/home/node/go/pkg/mod/github.com/bborbe/agent@v0.89.0/agent_markdown.go:62:func (m *Markdown) FindSection(heading string) (*Section, bool) {
+/home/node/go/pkg/mod/github.com/bborbe/agent@v0.89.0/agent_markdown.go:81:func (m *Markdown) ReplaceSection(section Section) {
+/home/node/go/pkg/mod/github.com/bborbe/agent@v0.89.0/agent_markdown.go:108:func (m *Markdown) Marshal(ctx context.Context) (string, error) {
+=== TaskFrontmatter ===
+16:type TaskFrontmatter map[string]interface{}
+17-
+18-func (f TaskFrontmatter) Status() domain.TaskStatus {
+19-	v, _ := f["status"].(string)
+20-	if canonical, ok := domain.NormalizeTaskStatus(v); ok {
+=== TaskFrontmatter String ===
+144:func (f TaskFrontmatter) String(key string) (string, bool) {
+[01:32:04] ⚠ [bash output]
+/home/node/go/pkg/mod/github.com/bborbe/agent@v0.89.0/agent_status.go-45-	NextPhase string
+=== NewPassthroughContentGenerator ===
+/home/node/go/pkg/mod/github.com/bborbe/agent@v0.89.0/delivery/content-generator.go:184:func NewPassthroughContentGenerator() ContentGenerator {
+=== mocks dir ===
+agent-agent-provider.go
+agent-ai-parser.go
+agent-result-deliverer.go
+agent-step.go
+claude-claude-runner.go
+claude-plugin-commander.go
+claude-plugin-installer.go
+claude-result-deliverer.go
+claude-task-runner.go
+delivery-content-generator.go
+=== claude runner mock ===
+claude-claude-runner.go
+claude-plugin-commander.go
+claude-plugin-installer.go
+claude-result-deliverer.go
+claude-task-runner.go

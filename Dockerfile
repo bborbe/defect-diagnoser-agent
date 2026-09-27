@@ -9,7 +9,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -mod=vendor -ldflags "-s" -a -in
 CMD ["/bin/bash"]
 
 FROM ${DOCKER_REGISTRY}/alpine:3.23 AS alpine
-RUN apk --no-cache add ca-certificates curl bash nodejs npm \
+RUN apk --no-cache add ca-certificates curl bash git nodejs npm \
  && npm install -g --omit=dev --no-optional @anthropic-ai/claude-code \
  && npm cache clean --force \
  && apk del npm \

@@ -47,7 +47,6 @@ Read these before writing anything:
 - `/home/node/.claude/plugins/marketplaces/coding/docs/go-patterns.md` — interface → constructor → struct, doc comments, error wrapping.
 - `/home/node/.claude/plugins/marketplaces/coding/docs/go-security-linting.md` — gosec expectations.
 
-</context>
 **Framework facts, all verified while writing this prompt against `github.com/bborbe/agent v0.89.0` at `$(go env GOMODCACHE)/github.com/bborbe/agent@v0.89.0`.** Read these files before writing code:
 
 - `agent_step.go` — `type Step interface { Name() string; ShouldRun(ctx, *Markdown) (bool, error); Run(ctx, *Markdown) (*Result, error) }`. A `Result` carries `Status AgentStatus`, `NextPhase string`, `Message string`. The framework marshals the mutated `*Markdown` after each step's `Run` and publishes it through the `ResultDeliverer`, so the `*Markdown` **is** the delivered body.
@@ -63,6 +62,51 @@ Read these before writing anything:
 
 1. `gopkg.in/yaml.v3` parses `file:line: pkg/x/y.go:42` with the key `file:line` and the value `pkg/x/y.go:42`, and parses a block scalar `confidence: |` + two indented lines into a value containing `\n`. A block scalar value ends with a trailing newline, so the newline check must be `strings.Contains(v, "\n")`.
 2. `agentlib.ParseMarkdown` splits a body at every column-0 `## ` line. A `## Verdict` section whose body contains a column-0 `## Verdict` line therefore round-trips into two sections. This is exactly the forgery the heading rule must catch **before** the markdown is re-parsed, which is why the rule runs inside the step's `Run`.
+
+
+<!-- Open questions for the reviewer — decisions taken here, each with the alternative:
+
+     1. AC4 says every gate-failed row's message "names the field (or file:line)". The
+        section-missing / no-yaml-block / unparseable-yaml rows have no field to name, so
+        this prompt pins three explicit messages for them (`verdict section missing`,
+        `verdict yaml block missing`, `verdict yaml does not parse`). Alternative: one
+        generic message. Pinned messages are used so the table test can assert exactly one.
+
+     2. Rule e's message deliberately does NOT echo the offending `file:line` value: the
+        docs' echoed-value rule lists rules b, g, h, i and the line-guard path, not e. That
+        is what makes AC4's "/abs/x.go:3 is absent from the delivered body" hold. The pinned
+        message contains the literal `file:line` and nothing else from the value.
+
+     3. docs/verdict-gate.md § Line guard describes reason 2 and 3 as quoting "the cited
+        path" and reason 4 as quoting "the cited `path:line`". This prompt follows that
+        literally: `resolves outside the clone` and `not found in clone` quote the path;
+        `beyond end of file (<n> lines)` quotes the path:line. If the operator wants
+        path:line everywhere, the two formats change together with the docs page.
+
+     4. AC5 says the needs_input message's evidence lines are "each prefixed `> `", while
+        docs § Failure messages says the prefix is "applied once, at the point the result
+        leaves the agent". This prompt keeps `Decision.Message` raw and prefixes exactly once
+        in the step wrapper, so the `> ` form is asserted on the delivered message. The gate
+        table asserts the raw `evidence:` form; the step test asserts the prefixed form.
+
+     5. AC7's "cited file sits in a directory that is itself a symlink resolving outside the
+        clone" is only detectable when the target file exists outside the clone. The guard
+        therefore also resolves the deepest existing ancestor, so a dangling escape still
+        reports `resolves outside the clone` rather than `not found in clone`.
+
+     6. The spec's Non-goal forbids "`service_repo.` entries in any Config or code file of
+        this repo", while AC9 only greps `README.md` (>= 1) and `k8s/` (0 lines). The literal
+        prefix `"service_repo."` is used in `pkg/verdict` as the lookup prefix for the keys
+        the OPERATOR supplies — it is the mechanism, not a mapping entry, and no key/value
+        pair is hard-coded. Reviewer: confirm this reading; the alternative is deriving the
+        prefix from the env context, which cannot distinguish the mapping keys from any
+        other ENV_CONTEXT key.
+
+     7. `Gate` is a concrete exported struct with a `New*` constructor rather than a public
+        interface. The gate is deterministic and cheap, so every test drives the real
+        implementation and an interface would have no fake and no second implementation.
+        Reviewer: confirm this is acceptable against the repo's interface-per-collaborator
+        convention; if not, add `//counterfeiter:generate` and a fake with a consumer. -->
 
 </context>
 
@@ -372,3 +416,59 @@ For rule g, when the frontmatter has no `defect_id`, render the frontmatter valu
 14. **Self-check before finishing.** Re-run `<verification>` and confirm every line passes. Walk requirements 1–13 against the code you wrote: confirm every reason string in the pinned table appears character for character, confirm every "removed" outcome really filters `md.Sections` rather than a string copy, and confirm no message the binary generates can put a `#` at column 0. Then walk the spec's `## Acceptance Criteria` AC4–AC7 row by row against your test table and confirm each row is actually asserted — a table entry that asserts nothing about status or body does not count.
 
 </requirements>
+
+<constraints>
+
+- **Contract** ([[Defect Lane Task Chain]], amended 2026-09-27; copied into `docs/verdict-gate.md` because the container cannot read the vault). The following are fixed: the `## Verdict` field names and their order; the `confidence` values `High | Medium | Low`; and the escalation split (no line → no Verdict; line + Medium/Low → Verdict kept; stage 2 only from High). `## Observation` is read and never rewritten.
+- **Gate rules are frozen in `docs/verdict-gate.md`.** A rule change updates that page in the same change. Do not change that page in this prompt.
+- **Frozen envelope:** the final-response JSON `{status, message, files}` that the delivery layer parses is unchanged.
+- **Escalation mechanics are the framework's.** `needs_input` clears `assignee`, sets `previous_assignee` and writes `## Failure`. `failed` keeps the assignee for the trigger-count retry. Do not reimplement any of it.
+- **Phase cursor.** The diagnoser writes no frontmatter field of its own except `phase`: on entering each phase it sets the parsed frontmatter `phase` to that phase. bborbe/agent v0.89.0 parses the frontmatter once per Job and a needs_input/failed delivery keeps that parsed phase, so without this an escalation after an in-process advance writes back the Job's entry phase.
+- **Do NOT add a confidence-threshold knob and do NOT add a gate opt-out flag.** `High`-only is the contract. This is an explicit spec Non-goal; if a future consumer demands variation, that is a separate spec.
+- **Do NOT add any `service_repo.` mapping entry** to this repo's Config, code, tests or docs. The mapping is operator-supplied input delivered through `ENV_CONTEXT`. The literal prefix `"service_repo."` exists in `pkg/verdict` only as the lookup prefix for the keys the operator supplies — it is not a mapping entry, and no key/value pair may be hard-coded.
+- **Do NOT add a `pod-logs.sh` or any pod-log / event read.** That waits on the Config CRD gaining a service-account field and is an explicit spec Non-goal.
+- Do NOT change the `github.com/bborbe/agent` module or its version. No `go get`, no version bump, and never `-mod=vendor`.
+- Do NOT change `pkg/factory/`, `pkg/prompts/`, `main.go`, `cmd/run-task/main.go`, `k8s/`, `README.md`, `CHANGELOG.md` or `agent/scripts/` in this prompt. Dispatch, phase-chain wiring, the per-phase prompts, the README mapping section and the CHANGELOG entry belong to the sibling prompts of this spec.
+- Do NOT create or edit the four read-only scripts. They are spec `read-only-observation-toolkit`'s deliverable, and **that spec must be merged before this one starts**.
+- Do NOT commit — dark-factory handles git.
+- Existing tests must still pass, and the healthcheck / oauth-probe routing is untouched.
+
+</constraints>
+
+<verification>
+
+Run every line from the repo root. All must pass.
+
+```bash
+make test          # the new pkg/verdict suite runs here
+make precommit     # AC1 — must exit 0
+
+# the new package exists, with one shared suite file
+test -f pkg/verdict/verdict.go
+test -f pkg/verdict/gate.go
+test -f pkg/verdict/lineguard.go
+test -f pkg/verdict/step.go
+test -f pkg/verdict/verdict_suite_test.go
+
+# new code reaches at least 80% statement coverage
+go test -mod=mod -coverprofile=/tmp/verdict-cover.out ./pkg/verdict/...
+test "$(go tool cover -func=/tmp/verdict-cover.out | tail -1 | sed -E 's/.* ([0-9]+)\.[0-9]+%/\1/')" -ge 80
+
+# every reason string the spec pins is present verbatim
+grep -qF 'no line cited; evidence:' pkg/verdict/*.go
+grep -qF 'evidence cites no live read' pkg/verdict/*.go
+grep -qF 'below High' pkg/verdict/*.go
+grep -qF 'resolves outside the clone' pkg/verdict/*.go
+grep -qF 'not found in clone' pkg/verdict/*.go
+grep -qF 'beyond end of file' pkg/verdict/*.go
+grep -qF 'does not resolve' pkg/verdict/*.go
+grep -qF 'heading rule: section %q contains a column-0 heading line' pkg/verdict/*.go
+
+# the line-guard tests must use their own temp clone, never the shared local one
+! grep -rn 'agent/repos' pkg/verdict/
+
+# project convention: no fmt.Errorf in pkg/
+! grep -rn 'fmt\.Errorf' pkg/verdict/
+```
+
+</verification>

@@ -1,8 +1,13 @@
 ---
-status: approved
+status: completed
 spec: [001-read-only-observation-toolkit]
+summary: Aligned the Config allowlist, image, and prose with the four existing observation scripts, routed both endpoint URLs through CLAUDE_ENV, and added pkg/scripts/consistency_test.go to enforce the agreement
+execution_id: defect-diagnoser-agent-diagnose-v1-exec-003-spec-001-config-allowlist-and-consistency
+dark-factory-version: dev
 created: "2026-09-27T22:45:00Z"
 queued: "2026-09-27T23:02:59Z"
+started: "2026-09-27T23:24:41Z"
+completed: "2026-09-27T23:32:08Z"
 branch: dark-factory/read-only-observation-toolkit
 ---
 
