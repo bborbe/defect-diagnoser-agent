@@ -10,7 +10,11 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-- fix: bump the `go` directive to 1.27.4 and the Dockerfile build image to `golang:1.27.4`, so image and module name the same toolchain. The update-go agent could not proceed because `make precommit` failed with exit 2 and no parseable findings, which it treats as a broken gate and never retries — the cause was the stale toolchain. `ERRCHECK_VERSION` v1.20.0 → v1.30.0 and `GOSEC_VERSION` v2.26.1 → v2.30.0, both of which cannot type-check the Go 1.27 stdlib; kept in step with the canonical `tools.env`.
+- chore: bump `ERRCHECK_VERSION` to v1.30.0 and `GOSEC_VERSION` to v2.30.0. The pinned versions could not type-check the Go 1.27 stdlib, and these stay in step with the canonical `tools.env`.
+
+## v0.1.4
+
+- chore: update Go to 1.27.4 and github.com/bborbe/agent to v0.141.1, github.com/bborbe/cqrs to v0.6.16, github.com/bborbe/errors to v1.6.7, github.com/bborbe/kafka to v1.29.14, github.com/bborbe/sentry to v1.10.8, github.com/bborbe/service to v1.11.4, github.com/bborbe/time to v1.27.28, github.com/bborbe/vault-cli to v0.192.4
 
 ## v0.1.3
 
