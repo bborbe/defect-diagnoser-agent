@@ -8,7 +8,7 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 * MINOR version when you add functionality in a backwards-compatible manner, and
 * PATCH version when you make backwards-compatible bug fixes.
 
-## Unreleased
+## v0.1.4
 
 - chore: update Go to 1.27.4 and github.com/bborbe/agent to v0.141.1, github.com/bborbe/cqrs to v0.6.16, github.com/bborbe/errors to v1.6.7, github.com/bborbe/kafka to v1.29.14, github.com/bborbe/sentry to v1.10.8, github.com/bborbe/service to v1.11.4, github.com/bborbe/time to v1.27.28, github.com/bborbe/vault-cli to v0.192.4
 
