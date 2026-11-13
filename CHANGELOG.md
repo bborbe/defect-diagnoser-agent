@@ -8,6 +8,10 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 * MINOR version when you add functionality in a backwards-compatible manner, and
 * PATCH version when you make backwards-compatible bug fixes.
 
+## Unreleased
+
+- fix: bump the `go` directive to 1.27.4 and the Dockerfile build image to `golang:1.27.4`, so image and module name the same toolchain. The update-go agent could not proceed because `make precommit` failed with exit 2 and no parseable findings, which it treats as a broken gate and never retries — the cause was the stale toolchain. `ERRCHECK_VERSION` v1.20.0 → v1.30.0 and `GOSEC_VERSION` v2.26.1 → v2.30.0, both of which cannot type-check the Go 1.27 stdlib; kept in step with the canonical `tools.env`.
+
 ## v0.1.3
 
 - chore: restate the do-not-merge contract in the gate workflow

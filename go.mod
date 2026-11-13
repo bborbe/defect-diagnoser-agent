@@ -1,6 +1,6 @@
 module github.com/bborbe/defect-diagnoser-agent
 
-go 1.27.3
+go 1.27.4
 
 tool (
 	github.com/maxbrunsfeld/counterfeiter/v6
