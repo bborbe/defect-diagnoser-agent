@@ -8,6 +8,10 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 * MINOR version when you add functionality in a backwards-compatible manner, and
 * PATCH version when you make backwards-compatible bug fixes.
 
+## Unreleased
+
+- feat: add a `check-task-link` gate that fails a PR whose body carries no `Task: <task_identifier>` line, and install Trivy from the upstream script so `test` stops failing on the retired keyring helper
+
 ## v0.1.5
 
 - chore: bump `ERRCHECK_VERSION` to v1.30.0 and `GOSEC_VERSION` to v2.30.0. The pinned versions could not type-check the Go 1.27 stdlib, and these stay in step with the canonical `tools.env`.
