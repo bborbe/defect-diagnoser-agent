@@ -8,6 +8,11 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 * MINOR version when you add functionality in a backwards-compatible manner, and
 * PATCH version when you make backwards-compatible bug fixes.
 
+## Unreleased
+
+- chore: remove 9 stale vulnerability ignores (withdrawn advisory, module absent from go.mod, or version outside the affected range)
+- chore: install Trivy from a pinned release tarball in CI so the job no longer depends on the retired apt-key helper
+
 ## v0.2.0
 
 - feat: add a `check-task-link` gate that fails a PR whose body carries no `Task: <task_identifier>` line, and install Trivy from the upstream script so `test` stops failing on the retired keyring helper
