@@ -8,6 +8,10 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 * MINOR version when you add functionality in a backwards-compatible manner, and
 * PATCH version when you make backwards-compatible bug fixes.
 
+## Unreleased
+
+- chore: remove orphaned section comments left in `.trivyignore` by the stale-ignore sweep
+
 ## v0.2.1
 
 - chore: remove 9 stale vulnerability ignores (withdrawn advisory, module absent from go.mod, or version outside the affected range)
