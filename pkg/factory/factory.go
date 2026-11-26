@@ -83,10 +83,9 @@ func CreateFileResultDeliverer(filePath string) agentlib.ResultDeliverer {
 	)
 }
 
-// CreateAgent assembles the full 3-phase claude agent. Single Claude step
-// shared across planning / in_progress / ai_review preserves the existing
-// CRD trigger.phases behavior — every phase runs Claude once and emits
-// done.
+// CreateAgent assembles the full 3-phase claude agent. Each phase has its own
+// step and instructions: planning writes ## Plan, execution writes ## Verdict
+// and ai_review writes ## Review, then advances to done.
 func CreateAgent(
 	claudeConfigDir claudelib.ClaudeConfigDir,
 	agentDir claudelib.AgentDir,
@@ -108,18 +107,34 @@ func CreateAgentFromRunner(
 	runner claudelib.ClaudeRunner,
 	envContext map[string]string,
 ) *agentlib.Agent {
-	step := claudelib.NewAgentStep(claudelib.AgentStepConfig{
-		Name:          "claude-task",
+	planningStep := claudelib.NewAgentStep(claudelib.AgentStepConfig{
+		Name:          "planning",
 		Runner:        runner,
-		Instructions:  prompts.BuildInstructions(),
+		Instructions:  prompts.BuildInstructions(domain.TaskPhasePlanning),
 		EnvContext:    envContext,
-		OutputSection: "## Result",
+		OutputSection: "## Plan",
+		NextPhase:     string(domain.TaskPhaseExecution),
+	})
+	executionStep := claudelib.NewAgentStep(claudelib.AgentStepConfig{
+		Name:          "execution",
+		Runner:        runner,
+		Instructions:  prompts.BuildInstructions(domain.TaskPhaseExecution),
+		EnvContext:    envContext,
+		OutputSection: "## Verdict",
+		NextPhase:     string(domain.TaskPhaseAIReview),
+	})
+	aiReviewStep := claudelib.NewAgentStep(claudelib.AgentStepConfig{
+		Name:          "ai_review",
+		Runner:        runner,
+		Instructions:  prompts.BuildInstructions(domain.TaskPhaseAIReview),
+		EnvContext:    envContext,
+		OutputSection: "## Review",
 		NextPhase:     "done",
 	})
 	return agentlib.NewAgent(
-		agentlib.NewPhase("planning", step),
-		agentlib.NewPhase(domain.TaskPhaseExecution, step),
-		agentlib.NewPhase("ai_review", step),
+		agentlib.NewPhase(domain.TaskPhasePlanning, planningStep),
+		agentlib.NewPhase(domain.TaskPhaseExecution, executionStep),
+		agentlib.NewPhase(domain.TaskPhaseAIReview, aiReviewStep),
 	)
 }
 

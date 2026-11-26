@@ -1,8 +1,13 @@
 ---
-status: approved
+status: completed
 spec: [002-diagnose-observed-defect-with-verdict-gate]
+summary: Replaced the shared scaffold prompt with per-phase planning, execution and ai_review prompts, selected by phase and built into three distinct factory steps.
+execution_id: defect-diagnoser-agent-diagnose-v1-exec-005-spec-002-per-phase-prompts
+dark-factory-version: v0.198.17
 created: "2026-09-28T01:40:00Z"
 queued: "2026-11-26T18:43:49Z"
+started: "2026-11-26T18:57:45Z"
+completed: "2026-11-26T19:02:34Z"
 branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 
