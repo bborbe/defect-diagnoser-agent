@@ -1,8 +1,13 @@
 ---
-status: approved
+status: completed
 spec: [002-diagnose-observed-defect-with-verdict-gate]
+summary: Routed defect-diagnose to the gate-wrapped three-phase diagnoser, retired llm, proved the chain end to end, and documented the service_repo mapping
+execution_id: defect-diagnoser-agent-diagnose-v1-exec-006-spec-002-wiring-dispatch-and-docs
+dark-factory-version: v0.198.17
 created: "2026-09-28T01:40:00Z"
 queued: "2026-11-26T18:43:49Z"
+started: "2026-11-26T19:02:35Z"
+completed: "2026-11-26T19:09:43Z"
 branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 

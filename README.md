@@ -63,6 +63,28 @@ Tune `ALLOWED_TOOLS` per task shape (minimum viable set):
 
 Prefer constrained `Bash(path:*)` forms over bare `Bash` to minimize shell attack surface.
 
+### Service → repo mapping
+
+The diagnoser owns no mapping data. The operator supplies one entry per service
+through the existing `ENV_CONTEXT` channel, in the form
+`service_repo.<service>=<owner>/<repo>` — comma-separated when there is more
+than one:
+
+```
+ENV_CONTEXT=service_repo.<service>=<owner>/<repo>,service_repo.<other>=<owner>/<repo>
+```
+
+Each entry renders into the prompt's `## Environment` section as
+`service_repo.<service>: <owner>/<repo>`. A service resolves **only** on an
+exact, case-sensitive key match: no fuzzy match, no fallback, and no repo taken
+from the model's own knowledge. An unmapped service escalates to the operator
+instead of guessing.
+
+This mapping is deliberately **not** committed to this repo's `k8s/` Config —
+it is environment-specific operator input. The deterministic rules the binary
+enforces on top of it (the verdict block, the gate, the line guard and the
+heading rule) are documented in `docs/verdict-gate.md`.
+
 ### Claude subprocess env allowlist
 
 `lib/claude/claude-runner.go` strips pod env down to a safe allowlist (`HOME,PATH,USER,TZ,...`) before spawning `claude`, so a variable visible in `kubectl describe pod` can still be absent from the subprocess. Custom env vars (API URLs, credentials) **must** be passed through `CLAUDE_ENV` — a comma-separated `KEY=VALUE` list set on the Config's `spec.env` (or `-claude-env` for a local run) and parsed by both entry points. Don't expect pod env to reach Claude by default.

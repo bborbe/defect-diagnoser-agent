@@ -10,6 +10,7 @@ package factory
 
 import (
 	"context"
+	"path/filepath"
 
 	agentlib "github.com/bborbe/agent"
 	claudelib "github.com/bborbe/agent/claude"
@@ -21,9 +22,15 @@ import (
 	"github.com/bborbe/vault-cli/pkg/domain"
 
 	"github.com/bborbe/defect-diagnoser-agent/pkg/prompts"
+	"github.com/bborbe/defect-diagnoser-agent/pkg/verdict"
 )
 
 const serviceName = "defect-diagnoser-agent"
+
+// TaskTypeDefectDiagnose is the work task type this binary exists to serve:
+// stage 1 of the defect lane. It is not exported by github.com/bborbe/agent,
+// so it is declared here.
+const TaskTypeDefectDiagnose agentlib.TaskType = "defect-diagnose"
 
 // CreateClaudeRunner constructs a ClaudeRunner pre-configured with tools,
 // model, working directory, and CLI environment.
@@ -96,17 +103,21 @@ func CreateAgent(
 ) *agentlib.Agent {
 	return CreateAgentFromRunner(
 		CreateClaudeRunner(claudeConfigDir, agentDir, allowedTools, model, claudeEnv),
+		agentDir,
 		envContext,
 	)
 }
 
 // CreateAgentFromRunner builds the 3-phase claude agent given a pre-constructed
-// ClaudeRunner. Used by CreateAgentProvider to share one runner across the
-// domain agent and the healthcheck-Claude liveness agent.
+// ClaudeRunner and the agent directory (whose repos/ subdirectory is the clone
+// root the verdict gate reads). Used by CreateAgentProvider to share one runner
+// across the domain agent and the healthcheck-Claude liveness agent.
 func CreateAgentFromRunner(
 	runner claudelib.ClaudeRunner,
+	agentDir claudelib.AgentDir,
 	envContext map[string]string,
 ) *agentlib.Agent {
+	gate := verdict.NewGate(envContext, filepath.Join(string(agentDir), "repos"))
 	planningStep := claudelib.NewAgentStep(claudelib.AgentStepConfig{
 		Name:          "planning",
 		Runner:        runner,
@@ -132,9 +143,9 @@ func CreateAgentFromRunner(
 		NextPhase:     "done",
 	})
 	return agentlib.NewAgent(
-		agentlib.NewPhase(domain.TaskPhasePlanning, planningStep),
-		agentlib.NewPhase(domain.TaskPhaseExecution, executionStep),
-		agentlib.NewPhase(domain.TaskPhaseAIReview, aiReviewStep),
+		agentlib.NewPhase(domain.TaskPhasePlanning, verdict.NewPlanningStep(planningStep)),
+		agentlib.NewPhase(domain.TaskPhaseExecution, verdict.NewExecutionStep(executionStep, gate)),
+		agentlib.NewPhase(domain.TaskPhaseAIReview, verdict.NewAIReviewStep(aiReviewStep, gate)),
 	)
 }
 
@@ -142,7 +153,7 @@ func CreateAgentFromRunner(
 // Returns lib.AgentProvider — main.go calls Get(ctx, taskType) to select the
 // appropriate *Agent. Pure plumbing; no conditional, no error.
 //
-// TaskTypeLLM routes to the existing 3-phase domain agent. TaskTypeHealthcheck
+// TaskTypeDefectDiagnose routes to the 3-phase diagnoser. TaskTypeHealthcheck
 // and TaskTypeOAuthProbe (transition alias) both route to the shared
 // healthcheck-Claude liveness agent, reusing the same ClaudeRunner.
 func CreateAgentProvider(
@@ -154,10 +165,10 @@ func CreateAgentProvider(
 	envContext map[string]string,
 ) agentlib.AgentProvider {
 	runner := CreateClaudeRunner(claudeConfigDir, agentDir, allowedTools, model, claudeEnv)
-	domainAgent := CreateAgentFromRunner(runner, envContext)
+	diagnoser := CreateAgentFromRunner(runner, agentDir, envContext)
 	livenessAgent := healthcheck.NewAgent(healthcheck.NewClaudeStep(runner))
 	return agentlib.NewAgentProvider(serviceName, map[agentlib.TaskType]*agentlib.Agent{
-		agentlib.TaskTypeLLM:         domainAgent,
+		TaskTypeDefectDiagnose:       diagnoser,
 		agentlib.TaskTypeHealthcheck: livenessAgent,
 		agentlib.TaskTypeOAuthProbe:  livenessAgent,
 	})

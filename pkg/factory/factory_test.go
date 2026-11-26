@@ -38,10 +38,16 @@ var _ = Describe("CreateAgentProvider", func() {
 		Expect(provider).NotTo(BeNil())
 	})
 
-	It("Get returns the domain agent for TaskTypeLLM", func() {
-		agent, err := provider.Get(ctx, agentlib.TaskTypeLLM)
+	It("Get returns the domain agent for TaskTypeDefectDiagnose", func() {
+		agent, err := provider.Get(ctx, factory.TaskTypeDefectDiagnose)
 		Expect(err).To(BeNil())
 		Expect(agent).NotTo(BeNil())
+	})
+
+	It("Get rejects the retired llm task type", func() {
+		_, err := provider.Get(ctx, agentlib.TaskType("llm"))
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("unknown task_type"))
 	})
 
 	It("Get returns the liveness agent for TaskTypeHealthcheck", func() {
@@ -82,7 +88,7 @@ var _ = Describe("CreateAgentProvider", func() {
 		})
 
 		It("error message contains the sorted accepted-types list", func() {
-			Expect(err.Error()).To(ContainSubstring("[healthcheck llm oauth-probe]"))
+			Expect(err.Error()).To(ContainSubstring("[defect-diagnose healthcheck oauth-probe]"))
 		})
 	})
 })
