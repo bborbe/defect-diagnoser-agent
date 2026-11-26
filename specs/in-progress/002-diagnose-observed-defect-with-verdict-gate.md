@@ -1,7 +1,8 @@
 ---
-status: generating
+status: prompted
 approved: "2026-09-27T22:27:39Z"
 generating: "2026-09-27T22:57:16Z"
+prompted: "2026-09-27T23:41:58Z"
 branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 

@@ -1,8 +1,9 @@
 ---
-status: prompted
+status: verifying
 approved: "2026-09-27T22:26:16Z"
 generating: "2026-09-27T22:27:05Z"
 prompted: "2026-09-27T22:57:16Z"
+verifying: "2026-09-27T23:32:08Z"
 branch: dark-factory/read-only-observation-toolkit
 ---
 
