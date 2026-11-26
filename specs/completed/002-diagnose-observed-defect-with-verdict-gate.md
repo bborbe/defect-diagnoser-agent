@@ -1,9 +1,10 @@
 ---
-status: verifying
+status: completed
 approved: "2026-09-27T22:27:39Z"
 generating: "2026-09-27T22:57:16Z"
 prompted: "2026-09-27T23:41:58Z"
 verifying: "2026-11-26T19:09:43Z"
+completed: "2026-11-26T19:49:11Z"
 branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 
