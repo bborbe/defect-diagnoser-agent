@@ -1,7 +1,8 @@
 ---
-status: draft
+status: approved
 spec: [002-diagnose-observed-defect-with-verdict-gate]
 created: "2026-09-28T01:40:00Z"
+queued: "2026-11-26T18:43:49Z"
 branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 
@@ -36,7 +37,7 @@ Read these before writing anything:
 - `docs/observation-scripts.md` — the authoritative contract for the four read-only scripts the prompts tell the model to call. The prompts must not contradict it, and must not invent a script.
 - `specs/in-progress/001-read-only-observation-toolkit.md` — the dependency spec. It provides the four scripts, the `GIT_REST_URL` / `PROMETHEUS_URL` forwarding and the `ALLOWED_TOOLS` string. **Spec 001 must be merged before this prompt runs.** Do not reimplement any of it, and do not edit `agent/scripts/`.
 - `prompts/completed/001-spec-001-http-observation-scripts.md` — house style for this repo.
-- `prompts/in-progress/003-spec-001-config-allowlist-and-consistency.md` — the three-way consistency test that scans `pkg/prompts/*.md` for `scripts/<name>.sh` mentions and asserts each mentioned script is allowlisted. Every script name you write into a prompt must be one of the four allowlisted names, spelled exactly `scripts/vault-read.sh`, `scripts/vault-list.sh`, `scripts/prometheus-query.sh`, `scripts/repo-clone.sh`.
+- `prompts/completed/003-spec-001-config-allowlist-and-consistency.md` — the three-way consistency test that scans `pkg/prompts/*.md` for `scripts/<name>.sh` mentions and asserts each mentioned script is allowlisted. Every script name you write into a prompt must be one of the four allowlisted names, spelled exactly `scripts/vault-read.sh`, `scripts/vault-list.sh`, `scripts/prometheus-query.sh`, `scripts/repo-clone.sh`.
 - `pkg/prompts/prompts.go`, `pkg/prompts/workflow.md`, `pkg/prompts/output-format.md`, `pkg/prompts/prompts_test.go`, `pkg/prompts/prompts_suite_test.go` — the files this prompt changes.
 - `pkg/factory/factory.go` — `CreateAgentFromRunner` builds the steps; read it before changing it.
 - `agent/.claude/CLAUDE.md` — the guardrails prose the model reads alongside these prompts. Do not edit it; make the prompts consistent with it.

@@ -1,7 +1,8 @@
 ---
-status: draft
+status: approved
 spec: [002-diagnose-observed-defect-with-verdict-gate]
 created: "2026-09-28T01:40:00Z"
+queued: "2026-11-26T18:43:49Z"
 branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 
@@ -39,7 +40,7 @@ Read these before writing anything:
 - `cmd/run-task/main.go` — the local-CLI entry point. It calls `factory.CreateAgent(claudeConfigDir, agentDir, allowedTools, model, claudeEnv, envContext)` and then `agent.Run(ctx, a.Phase, string(taskContent), deliverer)`. **Read it; do not edit it.** Its call must keep compiling unchanged.
 - `main.go` — the Kafka entry point. It calls `provider.Get(ctx, agentlib.TaskType(a.TaskType))`. **Read it; do not edit it.**
 - `README.md` — where the mapping section goes. Read the existing `### Config CRD env pattern` and `### Claude subprocess env allowlist` sections; add to them rather than restructuring the file.
-- `CHANGELOG.md` — the file to append an `## Unreleased` section to.
+- `CHANGELOG.md` — the file carrying the existing `## Unreleased` section; append one bullet to it.
 - `scenarios/001-diagnose-one-observed-defect.md` — already updated alongside this spec (its Setup carries a `service_repo.` entry and its Step 1 writes the task file with `defect_id`). **Do not edit it**; AC9 only checks it.
 - `agent/.claude/CLAUDE.md` — the guardrails prose. Do not edit it.
 - `docs/dod.md` — the Definition of Done for this repo.
@@ -75,7 +76,8 @@ Read these before writing anything:
         calls — is unchanged, and `factory_test.go`'s `CreateAgent` spec keeps compiling.
 
      2. AC3 is implemented as ten specs in `pkg/factory/phase_chain_test.go` driving the
-        real provider and the real `CreateFileResultDeliverer`, rather than as more step
+        real seam (`CreateAgentFromRunner` with the fake runner) and the real
+        `CreateFileResultDeliverer`, rather than as more step
         tests. AC3 asserts "the written task", which only the real content generator
         produces (it is what applies `status` / `phase` and splices `## Failure`); the
         step-level tables live in prompt 1.
@@ -172,22 +174,22 @@ Read these before writing anything:
    })
    ```
 
-   The map has exactly three entries. `agentlib.TaskTypeLLM` must not appear anywhere in `pkg/factory/`. `healthcheck` and `oauth-probe` keep returning the same liveness agent instance. The liveness agent's prompt must contain none of the diagnoser's instructions — it is built from `healthcheck.NewClaudeStep`, not from `prompts.BuildInstructions`.
+   The map has exactly three entries. `TaskTypeLLM` must not appear anywhere in `pkg/factory/` — including the existing `CreateAgentProvider` doc comment, which still says `TaskTypeLLM routes to the existing 3-phase domain agent`; rewrite that comment to describe `defect-diagnose`. `healthcheck` and `oauth-probe` keep returning the same liveness agent instance. The liveness agent's prompt must contain none of the diagnoser's instructions — it is built from `healthcheck.NewClaudeStep`, not from `prompts.BuildInstructions`.
 
-4. **Update the existing dispatch specs** in `pkg/factory/factory_test.go` so they describe the new table. The three that change are the ones asserting `TaskTypeLLM` returns the domain agent and the two asserting the accepted-types list. `Get(TaskTypeDefectDiagnose)` replaces `Get(agentlib.TaskTypeLLM)`; the accepted-types assertion becomes the literal `[defect-diagnose healthcheck oauth-probe]` (that is the sorted order of the new map's keys). Keep the assertions on the quoted offending value and on the binary name. Add one spec asserting `agentlib.TaskTypeLLM` now misses with `unknown task_type`. Leave `factory_kafka_topic_test.go` and every other spec in the file untouched.
+4. **Update the existing dispatch specs** in `pkg/factory/factory_test.go` so they describe the new table. The three that change are the ones asserting `TaskTypeLLM` returns the domain agent and the two asserting the accepted-types list. `Get(TaskTypeDefectDiagnose)` replaces `Get(agentlib.TaskTypeLLM)`; the accepted-types assertion becomes the literal `[defect-diagnose healthcheck oauth-probe]` (that is the sorted order of the new map's keys). Keep the assertions on the quoted offending value and on the binary name. Add one spec asserting `agentlib.TaskType("llm")` now misses with `unknown task_type` (use the literal, not the constant, so the `! grep -rq 'TaskTypeLLM'` check holds). Leave `factory_kafka_topic_test.go` and every other spec in the file untouched.
 
 5. **Prove the diagnoser is reachable, with a fake runner** — add `pkg/factory/diagnoser_dispatch_test.go`, `package factory_test`, using the existing `pkg/factory/factory_suite_test.go`:
 
-   - `Get(ctx, factory.TaskTypeDefectDiagnose)` returns a non-nil agent. Run it at `domain.TaskPhasePlanning` against a minimal task document and a `factory.CreateFileResultDeliverer(<temp file>)`, with an `agentmocks.ClaudeRunner` that records the prompt; assert the captured prompt contains `scripts/repo-clone.sh`. The prompt is `RunArgsForCall(0)`'s second argument.
-   - `Get(ctx, agentlib.TaskTypeHealthcheck)` and `Get(ctx, agentlib.TaskTypeOAuthProbe)` each return the liveness agent; run it with the same fake runner and assert the captured prompt contains none of `scripts/repo-clone.sh`, `scripts/vault-read.sh`, `scripts/prometheus-query.sh` and `## Verdict`.
-   - `Get(ctx, agentlib.TaskTypeLLM)` returns an error whose message contains `unknown task_type`.
+   - `Get(ctx, factory.TaskTypeDefectDiagnose)` returns a non-nil agent — a build-only reachability assertion; do not run it, because `CreateAgentProvider` builds its own real `CreateClaudeRunner` and cannot receive the fake. Drive the seam instead: `factory.CreateAgentFromRunner(fakeRunner, claudelib.AgentDir(tmp), envContext)` at `domain.TaskPhasePlanning` against a minimal task document and a `factory.CreateFileResultDeliverer(<temp file>)`, with an `agentmocks.ClaudeRunner` that records the prompt; assert the captured prompt contains `scripts/repo-clone.sh`. The prompt is `RunArgsForCall(0)`'s second argument.
+   - `Get(ctx, agentlib.TaskTypeHealthcheck)` and `Get(ctx, agentlib.TaskTypeOAuthProbe)` each return a non-nil liveness agent and the same instance — a build-only assertion. For the prompt content, build the liveness agent directly as `healthcheck.NewAgent(healthcheck.NewClaudeStep(fakeRunner))`, run it with the fake runner, and assert the captured prompt contains none of `scripts/repo-clone.sh`, `scripts/vault-read.sh`, `scripts/prometheus-query.sh` and `## Verdict` (the provider's own liveness agent cannot receive the fake).
+   - `Get(ctx, agentlib.TaskType("llm"))` returns an error whose message contains `unknown task_type`.
    - a boundary check for the new constant: `Expect(factory.TaskTypeDefectDiagnose.Validate(ctx)).To(Succeed())`, so a future rename that breaks the `^[a-z0-9-]+$` contract fails here rather than at deploy.
 
    Build the provider with a temp directory as the agent dir, so nothing the test does touches `agent/repos/`.
 
-6. **Wired phase-chain tests** — add `pkg/factory/phase_chain_test.go`, `package factory_test`. This is AC3. Every case drives the **real** provider and the **real** file deliverer, and asserts on the task file that `factory.CreateFileResultDeliverer` wrote.
+6. **Wired phase-chain tests** — add `pkg/factory/phase_chain_test.go`, `package factory_test`. This is AC3. Every case drives the **real** seam (`CreateAgentFromRunner` with the fake runner) and the **real** file deliverer, and asserts on the task file that `factory.CreateFileResultDeliverer` wrote.
 
-   **Harness.** One helper builds, for a case: a temp directory used as both the agent dir and the clone root (`<tmp>/repos/<owner>/<repo>/<path>`), the `envContext` mapping `{"service_repo.<service>": "<owner>/<repo>"}`, a task file written to a second temp path, the `agentmocks.ClaudeRunner` with one `RunReturnsOnCall` per model step, the provider from `factory.CreateAgentProvider`, and the agent from `provider.Get(ctx, factory.TaskTypeDefectDiagnose)`. The runner is then driven with `agent.Run(ctx, domain.TaskPhasePlanning, taskContent, factory.CreateFileResultDeliverer(taskPath))` and the resulting file is read back.
+   **Harness.** One helper builds, for a case: a temp directory used as both the agent dir and the clone root (`<tmp>/repos/<owner>/<repo>/<path>`), the `envContext` mapping `{"service_repo.<service>": "<owner>/<repo>"}`, a task file written to a second temp path, the `agentmocks.ClaudeRunner` with one `RunReturnsOnCall` per model step, and the agent built through the seam as `factory.CreateAgentFromRunner(fakeRunner, claudelib.AgentDir(tmp), envContext)` — `CreateAgentProvider` constructs its own real runner and cannot receive the fake, so assert `factory.CreateAgentProvider(...).Get(ctx, factory.TaskTypeDefectDiagnose)` is non-nil as a separate, build-only check. The runner is then driven with `agent.Run(ctx, domain.TaskPhasePlanning, taskContent, factory.CreateFileResultDeliverer(taskPath))` and the resulting file is read back.
 
    Set the fake's default `RunReturns` to a benign `{"status":"failed","message":"unexpected extra model call"}` envelope as well as the per-call stubs, so an extra model call fails the case with a readable message instead of panicking on a nil result.
 
@@ -221,7 +223,7 @@ Read these before writing anything:
 
    `grep -c 'service_repo\.' README.md` must be at least 1 and `grep -c 'docs/verdict-gate.md' README.md` must be at least 1. Leave the rest of the README's structure alone — in particular do not re-add any mention of pod logs or events, and do not touch the generic `Tune ALLOWED_TOOLS per task shape` table.
 
-8. **CHANGELOG.** Add an `## Unreleased` section above `## v0.0.0` with exactly one bullet describing what was implemented. Follow `changelog-guide.md`: the bullet needs a `feat:` prefix and must mention the diagnoser. Do not describe verification steps, do not list files, and do not use a prompt filename as the entry. This prompt owns the only `## Unreleased` entry for this spec — the sibling prompts deliberately add none.
+8. **CHANGELOG.** Append one `feat:` bullet to the existing `## Unreleased` section at the top of `CHANGELOG.md` (it already carries two bullets from spec 001); do not create a second `## Unreleased` heading. Follow `changelog-guide.md`: the bullet needs a `feat:` prefix and must mention the diagnoser. Do not describe verification steps, do not list files, and do not use a prompt filename as the entry. This prompt owns the only `## Unreleased` entry for this spec — the sibling prompts deliberately add none.
 
 9. **AC9 checks that need no edit, only confirmation.** `scenarios/001-diagnose-one-observed-defect.md` was already updated alongside this spec. Do not edit it. Confirm with the `<verification>` greps that its Setup block still carries a `service_repo.` entry and its Step 1 block still carries `defect_id`.
 
@@ -265,7 +267,7 @@ test "$(grep -c 'CreateAgentFromRunner(' pkg/factory/factory.go)" -ge 3
 grep -qF 'TaskTypeDefectDiagnose:' pkg/factory/factory.go
 grep -qE 'agentlib\.TaskTypeHealthcheck: +livenessAgent' pkg/factory/factory.go
 grep -qE 'agentlib\.TaskTypeOAuthProbe: +livenessAgent' pkg/factory/factory.go
-! grep -q 'agentlib.TaskTypeLLM' pkg/factory/
+! grep -rq 'TaskTypeLLM' pkg/factory/
 
 # AC9 — README documents the mapping form and links the rule set
 test "$(grep -c 'service_repo\.' README.md)" -ge 1

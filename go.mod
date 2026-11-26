@@ -19,11 +19,13 @@ require (
 	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/prometheus/client_golang v1.25.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/IBM/sarama v1.61.1 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
+	github.com/a2aproject/a2a-go/v2 v2.7.0 // indirect
 	github.com/bborbe/argument/v2 v2.13.11 // indirect
 	github.com/bborbe/collection v1.21.7 // indirect
 	github.com/bborbe/http v1.26.34 // indirect
@@ -90,7 +92,6 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.38.0-beta.0 // indirect
 	k8s.io/apiextensions-api v0.38.0-beta.0 // indirect
 	k8s.io/apiextensions-apiserver v0.38.0-beta.0 // indirect

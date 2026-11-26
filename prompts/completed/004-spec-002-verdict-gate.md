@@ -1,7 +1,13 @@
 ---
-status: draft
+status: completed
 spec: [002-diagnose-observed-defect-with-verdict-gate]
+summary: Added pkg/verdict with the model-output heading rule, deterministic verdict gate rules a-k, symlink-safe line guard and phase-recording step wrappers, locked down by 66 table-driven specs at 94.6% coverage.
+execution_id: defect-diagnoser-agent-diagnose-v1-exec-004-spec-002-verdict-gate
+dark-factory-version: v0.198.17
 created: "2026-09-28T01:40:00Z"
+queued: "2026-11-26T18:43:49Z"
+started: "2026-11-26T18:47:06Z"
+completed: "2026-11-26T18:57:44Z"
 branch: dark-factory/diagnose-observed-defect-with-verdict-gate
 ---
 
@@ -47,12 +53,12 @@ Read these before writing anything:
 - `/home/node/.claude/plugins/marketplaces/coding/docs/go-patterns.md` — interface → constructor → struct, doc comments, error wrapping.
 - `/home/node/.claude/plugins/marketplaces/coding/docs/go-security-linting.md` — gosec expectations.
 
-**Framework facts, all verified while writing this prompt against `github.com/bborbe/agent v0.89.0` at `$(go env GOMODCACHE)/github.com/bborbe/agent@v0.89.0`.** Read these files before writing code:
+**Framework facts, all verified while writing this prompt against `github.com/bborbe/agent v0.141.1` at `$(go env GOMODCACHE)/github.com/bborbe/agent@v0.141.1`.** Read these files before writing code:
 
 - `agent_step.go` — `type Step interface { Name() string; ShouldRun(ctx, *Markdown) (bool, error); Run(ctx, *Markdown) (*Result, error) }`. A `Result` carries `Status AgentStatus`, `NextPhase string`, `Message string`. The framework marshals the mutated `*Markdown` after each step's `Run` and publishes it through the `ResultDeliverer`, so the `*Markdown` **is** the delivered body.
 - `agent_markdown.go` — `type Markdown struct { Frontmatter TaskFrontmatter; Preamble string; Sections []Section }`, `type Section struct { Heading string; Body string }`, and `FindSection(heading string) (*Section, bool)`. `Sections` is an exported slice, so removal is a filter over it. There is **no** `RemoveSection` method.
 - `agent_task-frontmatter.go` — `type TaskFrontmatter map[string]interface{}` with `func (f TaskFrontmatter) String(key string) (string, bool)`.
-- `claude/agent-step.go` — `claude.NewAgentStep(claude.AgentStepConfig{Name, Runner, Instructions, EnvContext, OutputSection, NextPhase}) agentlib.Step`. On a `done` runner body it calls `md.ReplaceSection(Section{Heading: cfg.OutputSection, Body: <raw model response>})` and returns `Result{Status: AgentStatusDone, NextPhase: cfg.NextPhase}`. On a runner body that parses to a `needs_input` / `failed` envelope it returns that status **without writing the section**. On a runner error it returns `Result{Status: AgentStatusFailed, Message: "<name> claude run failed: ..."}`.
+- `claude/agent-step.go` — `claude.NewAgentStep(claude.AgentStepConfig{Name, Runner, Instructions, EnvContext, OutputSection, NextPhase}) agentlib.Step`. On a `done` runner body it writes the section through `md.ReplaceSection(Section{Heading: cfg.OutputSection, Body: …})`, where the body is the envelope's `output` field passed through `stripLeadingSectionHeading`; when the response is not an envelope, or the envelope carries no `output`, the raw runner text is written unchanged (`claude/agent-step.go:277-278`). It returns `Result{Status: AgentStatusDone, NextPhase: cfg.NextPhase}`. On a runner body that parses to a `needs_input` / `failed` envelope it returns that status **without writing the section**. On a runner error it returns `Result{Status: AgentStatusFailed, Message: "<name> claude run failed: ..."}`.
 - `agent_agent.go` — `Agent.Run` walks phases in-process: after a step returns `Done` with a `NextPhase` that names another phase on the same `Agent`, the next phase runs in the same process. It exits on any non-`Done` status.
 - `delivery/content-generator.go` — `NewPassthroughContentGenerator()` writes `## Failure` from `result.Message` for `failed` / `needs_input`, inside a ```` ``` ```` fence, and applies `status` / `phase` frontmatter. `agentlib.AgentResultInfo` is `{Status, Output, Message, NextPhase, ContinueToNext, AgentTurns, InteractionCount}`.
 - `mocks/claude-claude-runner.go` — the counterfeiter fake is importable as `agentmocks "github.com/bborbe/agent/mocks"` and offers `RunReturns(result *claude.ClaudeResult, err error)`, `RunReturnsOnCall(i int, result *claude.ClaudeResult, err error)`, `RunCallCount() int` and `RunArgsForCall(i int) (context.Context, string)`. Use it for every step test.
@@ -423,7 +429,7 @@ For rule g, when the frontmatter has no `defect_id`, render the frontmatter valu
 - **Gate rules are frozen in `docs/verdict-gate.md`.** A rule change updates that page in the same change. Do not change that page in this prompt.
 - **Frozen envelope:** the final-response JSON `{status, message, files}` that the delivery layer parses is unchanged.
 - **Escalation mechanics are the framework's.** `needs_input` clears `assignee`, sets `previous_assignee` and writes `## Failure`. `failed` keeps the assignee for the trigger-count retry. Do not reimplement any of it.
-- **Phase cursor.** The diagnoser writes no frontmatter field of its own except `phase`: on entering each phase it sets the parsed frontmatter `phase` to that phase. bborbe/agent v0.89.0 parses the frontmatter once per Job and a needs_input/failed delivery keeps that parsed phase, so without this an escalation after an in-process advance writes back the Job's entry phase.
+- **Phase cursor.** The diagnoser writes no frontmatter field of its own except `phase`: on entering each phase it sets the parsed frontmatter `phase` to that phase. bborbe/agent v0.141.1 parses the frontmatter once per Job and a needs_input/failed delivery keeps that parsed phase, so without this an escalation after an in-process advance writes back the Job's entry phase.
 - **Do NOT add a confidence-threshold knob and do NOT add a gate opt-out flag.** `High`-only is the contract. This is an explicit spec Non-goal; if a future consumer demands variation, that is a separate spec.
 - **Do NOT add any `service_repo.` mapping entry** to this repo's Config, code, tests or docs. The mapping is operator-supplied input delivered through `ENV_CONTEXT`. The literal prefix `"service_repo."` exists in `pkg/verdict` only as the lookup prefix for the keys the operator supplies — it is not a mapping entry, and no key/value pair may be hard-coded.
 - **Do NOT add a `pod-logs.sh` or any pod-log / event read.** That waits on the Config CRD gaining a service-account field and is an explicit spec Non-goal.
